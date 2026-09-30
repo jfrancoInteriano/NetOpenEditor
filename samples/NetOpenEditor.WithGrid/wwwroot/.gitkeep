@@ -1,0 +1,4 @@
+This app serves no static files of its own: NetOpenGrid and NetOpenEditor both serve their
+assets from their own assemblies. The folder still has to exist — ASP.NET registers wwwroot as
+the web root of a Web SDK project and builds a PhysicalFileProvider over it at startup, which
+throws DirectoryNotFoundException when it is missing.
