@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>NetOpenEditor.Example</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NetOpenEditor\NetOpenEditor.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Copied to the output of every project that references this one (integration/E2E tests serve it as WebRoot). -->
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

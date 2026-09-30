@@ -1,0 +1,50 @@
+@model QuoteForm
+@{
+    ViewData["Title"] = "Cotización";
+}
+<h1>Cotización</h1>
+<form method="post" id="quoteForm">
+    <div class="card">
+        <div asp-validation-summary="All"></div>
+        <label>Cliente</label>
+        <input class="hdr" asp-for="CustomerName" />
+        <input type="hidden" asp-for="Id" />
+    </div>
+    <div class="card">
+        @if (ViewData["LoadFromSource"] is true)
+        {
+            @* GET: the lines come from the registered line source, keyed by the document id. *@
+            <netopen-editor editor-id="quote-lines" key="@Model.Id" name-prefix="Lines" />
+        }
+        else
+        {
+            @* POST re-render: show what the user typed, never what the database holds. *@
+            <netopen-editor editor-id="quote-lines" rows="Model.Lines" name-prefix="Lines" />
+        }
+    </div>
+    <div class="card">Total: <span id="grand-total">0.00</span></div>
+    <button type="submit" class="btn" id="save">Guardar</button>
+</form>
+<script>
+    document.addEventListener('alpine:init', () => {
+        NetOpenEditor.configure('quote-lines', {
+            onLookupSelected(row, field, item, editor) {
+                if (field !== 'ProductId') return;
+                row.UnitPrice = item.price;
+                row.TaxRate = item.taxRate;
+                if (editor.num(row.Quantity) === 0) row.Quantity = 1;
+            },
+            compute(row, editor) {
+                row.LineTotal = editor.num(row.Quantity) * editor.num(row.UnitPrice) * (1 + editor.num(row.TaxRate) / 100);
+            }
+        });
+    });
+    // noe:ready fires once after hydration; without it a form whose lines come preloaded
+    // (from the line source) would show 0.00 until the user touched a cell.
+    const paintQuoteTotal = (e) => {
+        if (e.detail.id !== 'quote-lines') return;
+        document.getElementById('grand-total').textContent = (e.detail.totals.LineTotal || 0).toFixed(2);
+    };
+    document.addEventListener('noe:ready', paintQuoteTotal);
+    document.addEventListener('noe:change', paintQuoteTotal);
+</script>

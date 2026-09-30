@@ -1,0 +1,37 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup Label="NuGet package metadata">
+    <IsPackable>true</IsPackable>
+    <Authors>jfrancoInteriano</Authors>
+    <Company>NetOpenEditor</Company>
+    <Product>NetOpenEditor</Product>
+    <Copyright>Copyright (c) 2026 NetOpenEditor Contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://github.com/jfrancoInteriano/NetOpenEditor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jfrancoInteriano/NetOpenEditor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>editor;grid;inline-editing;header-detail;master-detail;aspnetcore;mvc;taghelper;alpinejs;dotnet;net10</PackageTags>
+    <!-- nuget.org does not resolve repo-relative links, so the package ships docs/nuget-readme.md
+         (plain Markdown, absolute URLs) instead of the GitHub README. -->
+    <PackageReadmeFile>nuget-readme.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Symbols, Source Link and docs">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591/CS1573: missing XML doc comments. Docs are encouraged but not mandatory. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)../docs/nuget-readme.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+</Project>

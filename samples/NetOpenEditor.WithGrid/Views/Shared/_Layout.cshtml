@@ -1,0 +1,53 @@
+@inject NetOpenEditor.Options.NetOpenEditorAssetOptions EditorAssets
+@inject NetOpenGrid.Infrastructure.Runtime.NetOpenGridAssetOptions GridAssets
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"] - NetOpenGrid + NetOpenEditor</title>
+    <script>
+        // Same key NetOpenGrid persists, so the grid page and this one share one theme.
+        if (localStorage.getItem('netgrid:theme') === 'dark') document.documentElement.classList.add('dark');
+    </script>
+    @* Head assets: once per page, however many grids or editors it embeds. *@
+    @Html.Raw(NetOpenGrid.Infrastructure.Rendering.GridAssetTags.Head(GridAssets, "grid"))
+    @Html.Raw(NetOpenEditor.Rendering.EditorAssetTags.Head(EditorAssets))
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #111827; }
+        .dark body, html.dark body { background: #0b1220; color: #e5e7eb; }
+        main { max-width: 68rem; margin: 0 auto; padding: 1.5rem; }
+        nav { display: flex; gap: 1rem; align-items: baseline; padding: .75rem 1.5rem; border-bottom: 1px solid #e5e7eb; background: #fff; }
+        html.dark nav { background: #111827; border-color: #374151; }
+        a { color: #1d4ed8; }
+        html.dark a { color: #60a5fa; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: .5rem; padding: 1rem; margin-bottom: 1rem; }
+        html.dark .card { background: #111827; border-color: #374151; }
+        .btn { padding: .5rem 1rem; border-radius: .375rem; background: #16a34a; color: #fff; border: 0; cursor: pointer; }
+        .muted { font-size: .8rem; opacity: .75; }
+        .doc-toggle { background: none; border: 0; color: #1d4ed8; cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+        html.dark .doc-toggle { color: #60a5fa; }
+        .doc-detail { padding: .75rem 1rem 1rem; background: #f8fafc; }
+        html.dark .doc-detail { background: #0b1220; }
+        .doc-editor-actions { display: flex; align-items: center; gap: .75rem; margin-top: .75rem; }
+        .doc-editor-saved { font-size: .8rem; color: #16a34a; }
+    </style>
+</head>
+<body>
+    <nav>
+        <strong>NetOpenGrid + NetOpenEditor</strong>
+        <a href="/documents">Documentos</a>
+        <button type="button" id="theme-toggle" style="margin-left:auto">Tema</button>
+    </nav>
+    <main>@RenderBody()</main>
+    @* htmx and Alpine ship with the grid package: one copy each, after both component runtimes. *@
+    <script src="@(GridAssets.AssetPrefix)/vendor/htmx.min.js" defer></script>
+    <script src="@(GridAssets.AssetPrefix)/vendor/alpine.min.js" defer></script>
+    <script>
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const dark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('netgrid:theme', dark ? 'dark' : 'light');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+/* NetOpenEditor — default styles. Override via --noe-* variables or the .noe-* classes. No !important here. */
+.noe {
+  --noe-border: #e5e7eb;
+  --noe-head-bg: #f9fafb;
+  --noe-head-text: #6b7280;
+  --noe-text: #111827;
+  --noe-muted: #9ca3af;
+  --noe-focus: #60a5fa;
+  --noe-error: #dc2626;
+  --noe-error-bg: #fef2f2;
+  --noe-phantom-bg: #fafafa;
+  --noe-hover-bg: #f9fafb;
+  --noe-active-bg: #eff6ff;
+  --noe-input-bg: #fff;
+  --noe-radius: .375rem;
+  --noe-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--noe-text);
+  font-size: .875rem;
+}
+[x-cloak] { display: none; }
+
+.noe-table { width: 100%; border-collapse: collapse; }
+.noe-th {
+  padding: .5rem .75rem; text-align: left; font-size: .75rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--noe-head-text); background: var(--noe-head-bg);
+  border-bottom: 1px solid var(--noe-border); white-space: nowrap;
+}
+.noe-th-index { width: 2.5rem; text-align: center; }
+.noe-th-actions { width: 2.75rem; }
+.noe-required { color: var(--noe-error); margin-left: .125rem; }
+
+.noe-td { padding: .25rem .5rem; border-bottom: 1px solid var(--noe-border); vertical-align: top; }
+.noe-td-index { text-align: center; color: var(--noe-muted); font-size: .75rem; padding-top: .6rem; }
+.noe-td-actions { text-align: center; white-space: nowrap; padding-top: .45rem; }
+.noe-align-end { text-align: right; }
+.noe-align-center { text-align: center; }
+
+.noe-table tbody tr:hover { background: var(--noe-hover-bg); }
+.noe-row-phantom { background: var(--noe-phantom-bg); }
+.noe-row-phantom .noe-input { border-style: dashed; }
+.noe-row-invalid { background: var(--noe-error-bg); }
+.noe-row-locked .noe-input { border-color: transparent; background: transparent; }
+
+.noe-input {
+  display: block; width: 100%; box-sizing: border-box; padding: .375rem .5rem;
+  border: 1px solid var(--noe-border); border-radius: var(--noe-radius);
+  font: inherit; color: inherit; background: var(--noe-input-bg);
+}
+.noe-input:focus { outline: none; border-color: var(--noe-focus); box-shadow: 0 0 0 1px var(--noe-focus); }
+.noe-input[readonly] { background: transparent; }
+.noe-num { text-align: right; font-family: var(--noe-font-mono); }
+.noe-num-text, .noe-total { font-family: var(--noe-font-mono); }
+.noe-text { display: block; padding: .375rem .5rem; }
+.noe-check { width: 1rem; height: 1rem; margin: .5rem auto; display: block; }
+
+.noe-invalid, .noe-invalid:focus { border-color: var(--noe-error); box-shadow: 0 0 0 1px var(--noe-error); }
+.noe-error { color: var(--noe-error); font-size: .7rem; margin-top: .125rem; }
+.noe-form-error { color: var(--noe-error); font-size: .8rem; margin-bottom: .5rem; }
+.noe-row-error {
+  display: inline-block; width: 1.1rem; height: 1.1rem; line-height: 1.1rem; text-align: center;
+  border-radius: 9999px; background: var(--noe-error); color: #fff; font-size: .7rem; font-weight: 700;
+  margin-right: .25rem; cursor: help;
+}
+
+.noe-btn-remove { border: 0; background: transparent; color: var(--noe-muted); cursor: pointer; padding: .25rem; border-radius: var(--noe-radius); line-height: 0; }
+.noe-btn-remove:hover { color: var(--noe-error); }
+
+.noe-tfoot .noe-td { background: var(--noe-head-bg); font-weight: 600; border-top: 2px solid var(--noe-focus); }
+.noe-tfoot-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--noe-head-text); }
+.noe-muted { color: var(--noe-muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+.noe-lookup { position: relative; }
+.noe-lookup-panel {
+  z-index: 1000; overflow-y: auto; background: var(--noe-input-bg); border: 1px solid var(--noe-border);
+  border-radius: var(--noe-radius); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+}
+.noe-lookup-status { padding: .5rem .75rem; color: var(--noe-muted); font-size: .8rem; }
+.noe-lookup-item { display: flex; gap: .5rem; align-items: baseline; padding: .4rem .75rem; cursor: pointer; }
+.noe-lookup-item.is-active { background: var(--noe-active-bg); }
+.noe-lookup-primary { font-family: var(--noe-font-mono); font-weight: 600; }
+.noe-lookup-secondary { color: var(--noe-head-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- Theme: follows the host. .dark is the class NetOpenGrid toggles and persists. --- */
+/* Following the OS is opt-in: an embedded editor must match the host page, not the machine.
+   Add .noe-auto on the editor or any ancestor to let the system decide. */
+@media (prefers-color-scheme: dark) {
+  .noe-auto .noe:not(.noe-light), .noe.noe-auto:not(.noe-light) {
+    --noe-border: #374151; --noe-head-bg: #111827; --noe-head-text: #9ca3af; --noe-text: #f3f4f6;
+    --noe-muted: #6b7280; --noe-focus: #3b82f6; --noe-error: #f87171; --noe-error-bg: #7f1d1d;
+    --noe-phantom-bg: #0b1220; --noe-hover-bg: #111827; --noe-active-bg: #1e3a5f; --noe-input-bg: #1f2937;
+  }
+}
+.dark .noe {
+  --noe-border: #374151; --noe-head-bg: #111827; --noe-head-text: #9ca3af; --noe-text: #f3f4f6;
+  --noe-muted: #6b7280; --noe-focus: #3b82f6; --noe-error: #f87171; --noe-error-bg: #7f1d1d;
+  --noe-phantom-bg: #0b1220; --noe-hover-bg: #111827; --noe-active-bg: #1e3a5f; --noe-input-bg: #1f2937;
+}
+/* Escape hatch: must outrank ".dark .noe" (0,2,0), so it is qualified and comes last. */
+.noe.noe-light, .light .noe, .dark .noe.noe-light {
+  --noe-border: #e5e7eb; --noe-head-bg: #f9fafb; --noe-head-text: #6b7280; --noe-text: #111827;
+  --noe-muted: #9ca3af; --noe-focus: #60a5fa; --noe-error: #dc2626; --noe-error-bg: #fef2f2;
+  --noe-phantom-bg: #fafafa; --noe-hover-bg: #f9fafb; --noe-active-bg: #eff6ff; --noe-input-bg: #fff;
+}
+```

@@ -1,0 +1,40 @@
+@{
+    ViewData["Title"] = "Demos";
+}
+
+<h1>NetOpenEditor</h1>
+<p class="lead">
+    Editor inline de líneas para forms header-detalle en ASP.NET Core MVC. Las columnas se declaran
+    en C# al registrar el editor; el runtime Alpine.js mantiene una fila vacía al final y los inputs
+    postean como <code>Lines[i].Campo</code>, así que el binding es nativo.
+</p>
+
+<div class="grid">
+    <a class="card demo" href="/journal/edit">
+        <h2>Póliza contable <span class="arrow">→</span></h2>
+        <p>Lookup remoto de cuentas, columnas de débito/crédito con totales, hook que pone en cero
+           la columna opuesta y validación de partida doble en el servidor.</p>
+        <code class="snippet">.Column(l =&gt; l.AccountId, c =&gt; c.Lookup("/accounts/lookup", ...))</code>
+    </a>
+
+    <a class="card demo" href="/quote/edit">
+        <h2>Cotización <span class="arrow">→</span></h2>
+        <p>Lookup de productos, cantidad entera, precio y columnas <em>calculadas</em>
+           (importe e impuesto) que no se postean y se recalculan en el cliente.</p>
+        <code class="snippet">.Computed("LineTotal", "Total", c =&gt; c.Decimal(2).Total())</code>
+    </a>
+</div>
+
+<div class="card">
+    <h2>Qué mirar en cada demo</h2>
+    <ul class="checks">
+        <li>La última fila siempre está vacía: al escribir en ella nace otra abajo.</li>
+        <li><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> / flechas para navegar celdas, <kbd>Esc</kbd> revierte la edición.</li>
+        <li>Escribe <code>150,5</code> en un importe: al salir se normaliza a <code>150.50</code>.</li>
+        <li>Guarda con errores para ver los mensajes del servidor pegados a cada celda.</li>
+        <li>Copia dos columnas de una hoja de cálculo y pégalas en la primera celda: se llenan varias filas de golpe.</li>
+        <li><kbd>Ctrl+D</kbd> duplica la fila, <kbd>Ctrl+Supr</kbd> la borra, <kbd>Ctrl+Enter</kbd> inserta una arriba.</li>
+        <li><em>Ver código fuente</em> de la página: los tres <code>&lt;script type="application/json"&gt;</code>
+            (config, filas, errores) son todo el estado que el servidor manda.</li>
+    </ul>
+</div>

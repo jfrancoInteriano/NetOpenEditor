@@ -1,0 +1,36 @@
+@model JournalEntryForm
+@{
+    ViewData["Title"] = "Asiento";
+}
+<h1>Asiento contable</h1>
+<form method="post" id="entryForm">
+    <div class="card">
+        <div asp-validation-summary="All" id="summary"></div>
+        <label>Fecha</label>
+        <input class="hdr" asp-for="EntryDate" type="date" />
+        <label>Descripción</label>
+        <input class="hdr" asp-for="Description" />
+    </div>
+    <div class="card">
+        <netopen-editor editor-id="journal-lines" rows="Model.Lines" name-prefix="Lines" />
+    </div>
+    <div class="card">Diferencia: <span id="diff">0.00</span></div>
+    <button type="submit" class="btn" id="save">Guardar</button>
+</form>
+<script>
+    document.addEventListener('alpine:init', () => {
+        NetOpenEditor.configure('journal-lines', {
+            onCellChange(row, field, editor) {
+                if (field === 'DebitAmount' && editor.num(row.DebitAmount) > 0) row.CreditAmount = 0;
+                if (field === 'CreditAmount' && editor.num(row.CreditAmount) > 0) row.DebitAmount = 0;
+            }
+        });
+    });
+    const paintDiff = (e) => {
+        if (e.detail.id !== 'journal-lines') return;
+        const t = e.detail.totals;
+        document.getElementById('diff').textContent = ((t.DebitAmount || 0) - (t.CreditAmount || 0)).toFixed(2);
+    };
+    document.addEventListener('noe:ready', paintDiff);
+    document.addEventListener('noe:change', paintDiff);
+</script>

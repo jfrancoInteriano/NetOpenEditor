@@ -1,0 +1,62 @@
+@inject NetOpenEditor.Options.NetOpenEditorAssetOptions EditorAssets
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"] - NetOpenEditor sample</title>
+    @* Editor runtime (deferred). Alpine loads deferred at the END of body, so it runs after this. *@
+    @Html.Raw(NetOpenEditor.Rendering.EditorAssetTags.Head(EditorAssets))
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; color: #111827; }
+        h1 { font-size: 1.25rem; }
+        .card { border: 1px solid #e5e7eb; border-radius: .5rem; padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
+        label { display: block; font-size: .75rem; color: #4b5563; margin-top: .5rem; }
+        input.hdr { padding: .4rem; border: 1px solid #d1d5db; border-radius: .375rem; }
+        .btn { padding: .5rem 1rem; border-radius: .375rem; background: #16a34a; color: #fff; border: 0; cursor: pointer; }
+        .validation-summary-errors { color: #b91c1c; font-size: .875rem; }
+        a { color: #1d4ed8; }
+        nav.top { display: flex; gap: 1rem; align-items: baseline; margin-bottom: 1.5rem; padding-bottom: .5rem; border-bottom: 1px solid #e5e7eb; }
+        nav.top .brand { font-weight: 600; color: #111827; text-decoration: none; }
+        nav.top a { font-size: .875rem; text-decoration: none; }
+        nav.top a.active { font-weight: 600; text-decoration: underline; }
+        .lead { max-width: 46rem; color: #374151; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; }
+        .card.demo { display: block; text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
+        .card.demo:hover { border-color: #1d4ed8; box-shadow: 0 1px 6px rgba(17, 24, 39, .08); }
+        .card h2 { font-size: 1rem; margin: 0 0 .5rem; }
+        .card .arrow { color: #1d4ed8; }
+        .snippet { display: block; margin-top: .75rem; font-size: .75rem; color: #4b5563; background: #f9fafb; border-radius: .375rem; padding: .4rem .5rem; overflow-x: auto; }
+        .checks { margin: 0; padding-left: 1.1rem; font-size: .875rem; color: #374151; }
+        .checks li { margin: .25rem 0; }
+        nav.top .theme { margin-left: auto; font-size: .75rem; padding: .25rem .6rem; border: 1px solid #d1d5db; border-radius: .375rem; background: transparent; cursor: pointer; color: inherit; }
+        .dark body { background: #0b1220; color: #e5e7eb; }
+        .dark nav.top { border-color: #374151; }
+        .dark nav.top .brand { color: #f3f4f6; }
+        .dark .card { border-color: #374151; }
+        .dark input.hdr { background: #1f2937; color: #f3f4f6; border-color: #374151; }
+        kbd { font-family: ui-monospace, monospace; font-size: .75rem; border: 1px solid #d1d5db; border-bottom-width: 2px; border-radius: .25rem; padding: 0 .3rem; }
+    </style>
+    <script>
+        // Same key NetOpenGrid persists, so both components share one theme toggle.
+        if (localStorage.getItem('netgrid:theme') === 'dark') document.documentElement.classList.add('dark');
+    </script>
+</head>
+<body>
+    @{ var path = Context.Request.Path.Value ?? "/"; }
+    <nav class="top">
+        <a class="brand" href="/">NetOpenEditor</a>
+        <a href="/journal/edit" class="@(path.StartsWith("/journal") ? "active" : null)">Póliza contable</a>
+        <a href="/quote/edit" class="@(path.StartsWith("/quote") ? "active" : null)">Cotización</a>
+        <button type="button" class="theme" id="theme-toggle">Tema</button>
+    </nav>
+    <script>
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const dark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('netgrid:theme', dark ? 'dark' : 'light');
+        });
+    </script>
+    @RenderBody()
+    <script src="/lib/alpine.min.js" defer></script>
+</body>
+</html>

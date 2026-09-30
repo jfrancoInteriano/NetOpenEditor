@@ -1,0 +1,7 @@
+@model object
+@{
+    ViewData["Title"] = "Resultado";
+}
+<h1>Recibido en el servidor</h1>
+<pre id="bound-json">@System.Text.Json.JsonSerializer.Serialize(Model, Model.GetType(), new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+<a href="/journal/edit">Volver</a>

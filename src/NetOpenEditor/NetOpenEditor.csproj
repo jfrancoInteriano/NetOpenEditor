@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Package metadata, Source Link and symbols live in src/Directory.Build.props. -->
+  <PropertyGroup>
+    <PackageId>NetOpenEditor</PackageId>
+    <Description>Inline line editor for header-detail forms in ASP.NET Core MVC (.NET 10). Columns are declared once in C#, an Alpine.js runtime edits cell by cell (text, number, date, select, remote lookup, toggle, computed), and the header form posts Lines[i].Field for native model binding: no changes to controllers or services. Per-cell ModelState errors, footer totals, keyboard navigation and spreadsheet paste. Assets are embedded; Alpine.js 3 is provided by the host.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\netopeneditor.js" />
+    <EmbeddedResource Include="Assets\netopeneditor.css" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,92 @@
+@{
+    ViewData["Title"] = "Documentos";
+}
+
+<h1 style="font-size:1.25rem;">Editor dentro del grid</h1>
+<p class="muted">
+    <strong>NetOpenGrid</strong> (paquete público 1.0.3) renderiza el listado como fragmento dentro de
+    esta vista. Al desplegar un documento, sus líneas se editan con <strong>NetOpenEditor</strong>
+    <em>en una fila del propio grid</em>, sin salir de la página ni abrir otra sección.
+</p>
+
+<div class="card">
+    <grid-fragment grid-id="documents" />
+</div>
+
+<script>
+    (() => {
+        // Everything is delegated on document: htmx replaces the grid's <tbody> on every page,
+        // filter or sort, and a listener bound to that element would die with the first swap.
+        const body = () => document.getElementById('documents-body');
+        const detailOf = (docId) => document.querySelector(`tr[data-detail-for="${docId}"]`);
+
+        const close = (docId) => {
+            const row = detailOf(docId);
+            if (row) row.remove();
+            const toggle = document.querySelector(`.doc-toggle[data-doc-id="${docId}"]`);
+            if (toggle) toggle.textContent = toggle.dataset.labelClosed;
+        };
+
+        const open = async (toggle, docId) => {
+            const gridRow = toggle.closest('tr');
+            const detail = document.createElement('tr');
+            detail.dataset.detailFor = docId;
+            const cell = document.createElement('td');
+            cell.colSpan = gridRow.children.length;
+            cell.className = 'doc-detail';
+            cell.innerHTML = '<span class="muted">Cargando…</span>';
+            detail.appendChild(cell);
+            gridRow.after(detail);
+            toggle.textContent = toggle.dataset.labelOpen;
+
+            const resp = await fetch(`/documents/${encodeURIComponent(docId)}/editor`, {
+                // no-store: reopening a row must show what was just saved, not a cached copy.
+                cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            // Alpine watches the DOM, so the editor boots itself once this markup lands.
+            cell.innerHTML = resp.ok ? await resp.text() : '<span class="muted">No se pudo cargar el editor.</span>';
+        };
+
+        // Match the toggle by its own class: the form inside the detail also carries data-doc-id,
+        // and a looser selector turned every click on the editor into "collapse this row".
+        document.addEventListener('click', (e) => {
+            const toggle = e.target.closest('.doc-toggle');
+            if (!toggle) return;
+            e.preventDefault();
+            const docId = toggle.dataset.docId;
+            const wasOpen = detailOf(docId) !== null;
+
+            // One open document at a time keeps the demo readable.
+            for (const row of document.querySelectorAll('tr[data-detail-for]')) close(row.dataset.detailFor);
+            if (!wasOpen) open(toggle, docId);
+        });
+
+        // The editor reports its own totals; mirror them next to the save button.
+        const paintTotal = (e) => {
+            if (e.detail.id !== 'doc-lines') return;
+            const form = e.target.closest('form.doc-editor');
+            const label = form && form.querySelector('[data-doc-total]');
+            if (label) label.textContent = (e.detail.totals.UnitPrice || 0).toFixed(2);
+        };
+        document.addEventListener('noe:ready', paintTotal);
+        document.addEventListener('noe:change', paintTotal);
+
+        // Saving posts the very same names the ERP would bind: lines[i].Field.
+        document.addEventListener('submit', async (e) => {
+            const form = e.target.closest('form.doc-editor');
+            if (!form) return;
+            e.preventDefault();
+
+            const resp = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+            if (!resp.ok) return;
+            const saved = form.querySelector('.doc-editor-saved');
+            if (saved) { saved.hidden = false; setTimeout(() => { saved.hidden = true; }, 2000); }
+
+            // The grid row keeps its own total: update just that cell instead of reloading the grid.
+            const result = await resp.json();
+            const cell = (body() || document).querySelector(`[data-total-for="${result.id}"]`);
+            if (cell) cell.textContent = Number(result.total).toFixed(2);
+        });
+    })();
+</script>

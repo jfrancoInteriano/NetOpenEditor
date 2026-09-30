@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="src/NetOpenEditor/NetOpenEditor.csproj" />
+  <Project Path="samples/NetOpenEditor.Example/NetOpenEditor.Example.csproj" />
+  <Project Path="samples/NetOpenEditor.WithGrid/NetOpenEditor.WithGrid.csproj" />
+  <Project Path="tests/NetOpenEditor.Tests/NetOpenEditor.Tests.csproj" />
+  <Project Path="tests/NetOpenEditor.Integration.Tests/NetOpenEditor.Integration.Tests.csproj" />
+  <Project Path="tests/NetOpenEditor.E2E.Tests/NetOpenEditor.E2E.Tests.csproj" />
+</Solution>

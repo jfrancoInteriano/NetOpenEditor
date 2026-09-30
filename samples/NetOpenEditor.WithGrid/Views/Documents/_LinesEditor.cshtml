@@ -1,0 +1,12 @@
+@using NetOpenEditor.WithGrid.Models
+@model Document
+
+@* This whole fragment lands inside a <td> of the grid's detail row. A <form> is valid there. *@
+<form class="doc-editor" method="post" action="/documents/@Model.Id/lines" data-doc-id="@Model.Id">
+    <netopen-editor editor-id="doc-lines" key="@Model.Id" name-prefix="lines" />
+    <div class="doc-editor-actions">
+        <button type="submit" class="btn">Guardar líneas</button>
+        <span class="muted">Total: <strong data-doc-total>0.00</strong></span>
+        <span class="doc-editor-saved" hidden>Guardado ✓</span>
+    </div>
+</form>
