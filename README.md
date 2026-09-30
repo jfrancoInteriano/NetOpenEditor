@@ -119,6 +119,34 @@ El controller recibe `List<JournalLine> Lines` bindeada por índice, exactamente
 
 TagHelper: `editor-id`, `rows`, `name-prefix` (default `Lines`), `hide-columns="A,B"` (se postean como hidden).
 
+## Filas fijas: `AllowAdd(false)`
+
+Por defecto el editor mantiene una fila vacía al final que se vuelve real en cuanto el usuario
+escribe en ella. Para editores cuyas líneas vienen dadas —una recepción contra una orden de compra,
+una requisición que solo se despacha— declara que no se pueden agregar:
+
+```csharp
+.AddEditor<ReceiptLine>("receipt-lines", e => e
+    .Column(l => l.ProductCode, c => c.ReadOnly())
+    .Column(l => l.Received, c => c.Decimal(2).Total())
+    .AllowAdd(false));
+```
+
+Con `AllowAdd(false)` **no hay fila fantasma** y ninguna de las vías de creación funciona: ni escribir
+en la última celda, ni `Ctrl+Enter`, ni `Ctrl+D`, ni pegar más filas de las que existen (el bloque se
+recorta a las filas disponibles), ni `NetOpenEditor.get(id).addRow(...)`, que devuelve `null` sin
+tocar el estado. Las celdas siguen siendo editables y la validación sigue corriendo: es lo único que
+se apaga.
+
+Cuando el editor se queda sin filas, el cuerpo muestra el texto `rows.empty` ("Sin líneas") en vez de
+quedar vacío.
+
+**Borrar no cambia:** se sigue controlando con el hook `canRemove`. Y `AllowAdd(false)` convive con
+`MinRows(n)`: el mínimo sigue siendo el suelo para borrar las líneas que llegaron del servidor. Si los
+datos llegan por debajo de ese mínimo, `validate()` lo reporta al guardar, como siempre.
+
+Ejemplo vivo: `/receipt/edit` en `samples/NetOpenEditor.Example`.
+
 ## Hooks y API
 
 ```js

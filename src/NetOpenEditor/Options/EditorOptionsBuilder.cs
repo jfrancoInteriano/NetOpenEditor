@@ -9,6 +9,7 @@ public sealed partial class EditorOptionsBuilder<TLine>
     private readonly string _id;
     private readonly List<IEditorColumnBuilder<TLine>> _columns = [];
     private int _minRows;
+    private bool _allowAdd = true;
 
     public EditorOptionsBuilder(string id)
     {
@@ -51,6 +52,21 @@ public sealed partial class EditorOptionsBuilder<TLine>
         return this;
     }
 
+    /// <summary>
+    /// Whether the user can create rows. Default <see langword="true"/>. With <see langword="false"/>
+    /// the trailing empty row is not rendered and no shortcut, paste or API call adds one; cells stay
+    /// editable. Use it for editors whose rows come fixed from a source document.
+    /// </summary>
+    /// <remarks>
+    /// Combining it with <see cref="MinRows"/> is allowed: MinRows stays the floor for deleting rows
+    /// that arrived from the server.
+    /// </remarks>
+    public EditorOptionsBuilder<TLine> AllowAdd(bool allowAdd = true)
+    {
+        _allowAdd = allowAdd;
+        return this;
+    }
+
     public EditorOptionsBuilder<TLine> MinRows(int minRows)
     {
         if (minRows < 0) throw new EditorConfigurationException($"Editor '{_id}': MinRows cannot be negative.");
@@ -87,7 +103,7 @@ public sealed partial class EditorOptionsBuilder<TLine>
             throw new EditorConfigurationException($"Editor '{_id}' needs at least one column.");
         }
 
-        return new EditorOptions<TLine> { Id = _id, Columns = built, MinRows = _minRows };
+        return new EditorOptions<TLine> { Id = _id, Columns = built, MinRows = _minRows, AllowAdd = _allowAdd };
     }
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9_-]{0,63}$")]

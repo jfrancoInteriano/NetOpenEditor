@@ -84,7 +84,11 @@ public sealed class EditorHtmlRenderer<TLine>
             sb.Append($$"""<input type="hidden" :name="nameFor(i, '{{column.Field}}')" :value="row['{{column.Field}}'] ?? ''">""");
         }
 
-        sb.Append("</td></tr></template></tbody>");
+        sb.Append("</td></tr></template>");
+
+        // With AllowAdd(false) the phantom row is gone, so an empty set would leave an empty body.
+        sb.Append($"<tr class=\"noe-row-empty\" x-show=\"rows.length === 0\"><td class=\"noe-td noe-empty\" colspan=\"{visible.Count + 2}\" x-text=\"t('rows.empty')\"></td></tr>");
+        sb.Append("</tbody>");
         AppendFooter(sb, visible);
         sb.Append("</table>");
         sb.Append(LookupPanel);

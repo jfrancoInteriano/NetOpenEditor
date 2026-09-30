@@ -178,4 +178,38 @@ public sealed class EditorOptionsBuilderTests
         Assert.Equal(4, options.Columns[1].Decimals);
         Assert.True(options.Columns[1].Total);
     }
+
+    [Fact]
+    public void AllowAdd_DefaultsToTrue()
+    {
+        var options = Builder().Column(l => l.Description).Build();
+
+        Assert.True(options.AllowAdd);
+    }
+
+    [Fact]
+    public void AllowAdd_False_RoundTripsThroughBuild()
+    {
+        var options = Builder().Column(l => l.Description).AllowAdd(false).Build();
+
+        Assert.False(options.AllowAdd);
+    }
+
+    [Fact]
+    public void AllowAdd_WithoutArgument_TurnsItOn()
+    {
+        var options = Builder().Column(l => l.Description).AllowAdd(false).AllowAdd().Build();
+
+        Assert.True(options.AllowAdd);
+    }
+
+    [Fact]
+    public void AllowAdd_False_CoexistsWithMinRows()
+    {
+        // Not a contradiction: MinRows is the floor for deleting rows that arrived from the server.
+        var options = Builder().Column(l => l.Description).AllowAdd(false).MinRows(2).Build();
+
+        Assert.False(options.AllowAdd);
+        Assert.Equal(2, options.MinRows);
+    }
 }

@@ -1,0 +1,20 @@
+@model ReceiptForm
+@{
+    ViewData["Title"] = "Recepción";
+}
+<h1>Recepción de mercancía</h1>
+<p class="muted">
+    Las líneas vienen de la orden de compra: el editor se registra con <code>AllowAdd(false)</code>,
+    así que no hay fila vacía al final ni forma de agregar renglones. Las celdas siguen siendo editables.
+</p>
+<form method="post" id="receiptForm">
+    <div class="card">
+        <div asp-validation-summary="All"></div>
+        <label>Orden de compra</label>
+        <input class="hdr" asp-for="Reference" readonly />
+    </div>
+    <div class="card">
+        <netopen-editor editor-id="receipt-lines" rows="Model.Lines" name-prefix="Lines" />
+    </div>
+    <button type="submit" class="btn" id="save">Guardar recepción</button>
+</form>

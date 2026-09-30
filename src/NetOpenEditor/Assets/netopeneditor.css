@@ -51,6 +51,7 @@
 .noe-num { text-align: right; font-family: var(--noe-font-mono); }
 .noe-num-text, .noe-total { font-family: var(--noe-font-mono); }
 .noe-text { display: block; padding: .375rem .5rem; }
+.noe-empty { text-align: center; color: var(--noe-muted); padding: 1rem; }
 .noe-check { width: 1rem; height: 1rem; margin: .5rem auto; display: block; }
 
 .noe-invalid, .noe-invalid:focus { border-color: var(--noe-error); box-shadow: 0 0 0 1px var(--noe-error); }

@@ -10,7 +10,7 @@ public sealed class LocalizationOptionsTests
         var loc = new NetOpenEditorLocalizationOptions();
         Assert.Equal("Remove line", loc.Effective["remove"]);
         Assert.Equal("{n} lines", loc.Effective["rows.many"]);
-        Assert.Equal(11, loc.Effective.Count);
+        Assert.Equal(12, loc.Effective.Count);
     }
 
     [Fact]

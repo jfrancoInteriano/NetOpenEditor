@@ -22,6 +22,7 @@ public static class EditorConfigJsonWriter
         writer.WriteString("id", options.Id);
         writer.WriteString("prefix", context.NamePrefix);
         writer.WriteNumber("minRows", options.MinRows);
+        writer.WriteBoolean("allowAdd", options.AllowAdd);
 
         writer.WritePropertyName("locale");
         writer.WriteStartObject();

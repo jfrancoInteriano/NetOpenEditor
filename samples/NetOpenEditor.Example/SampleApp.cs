@@ -47,7 +47,16 @@ public static class SampleApp
                 .Column(l => l.TaxRate, c => c.Header("ISV %").Decimal(2).Width("7rem"))
                 .Computed("LineTotal", "Total", c => c.Decimal(2).Total().Width("9rem"))
                 .MinRows(1))
-            .FromSource<QuoteLineSource>();
+            .FromSource<QuoteLineSource>()
+            // Rows come from the purchase order: editable cells, but no way to add lines.
+            .AddEditor<ReceiptLine>("receipt-lines", e => e
+                .Column(l => l.ProductCode, c => c.Header("Código").ReadOnly().Width("8rem"))
+                .Column(l => l.ProductName, c => c.Header("Producto").ReadOnly())
+                .Column(l => l.Ordered, c => c.Header("Pedido").Decimal(2).ReadOnly().Width("8rem"))
+                .Column(l => l.Received, c => c.Header("Recibido").Decimal(2).Total().Width("9rem"))
+                .Column(l => l.Batch, c => c.Header("Lote").Width("10rem"))
+                .Column(l => l.PurchaseOrderDetailId, c => c.Hidden())
+                .AllowAdd(false));
 
         var app = builder.Build();
         app.UseRequestLocalization();

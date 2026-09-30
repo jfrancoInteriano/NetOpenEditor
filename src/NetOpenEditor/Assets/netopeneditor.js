@@ -19,6 +19,7 @@
     'rows.many': '{n} lines',
     required: 'Required',
     minRows: 'At least {n} line(s) required',
+    'rows.empty': 'No lines',
     'paste.truncated': 'Only the first {n} rows were pasted.',
     'lookup.notFound': "'{term}' was not found",
     'lookup.ambiguous': "'{term}' matches more than one item"
@@ -126,11 +127,13 @@
         this.columns = this.config.columns || [];
         this.locale = this.config.locale || {};
         this.hooks = HOOKS[id] || {};
+        // Missing in configs from older packages: adding stays on unless the editor opts out.
+        this.allowAdd = this.config.allowAdd !== false;
 
         const rows = readJson(this.$root, 'data-noe-rows') || [];
         const errors = readJson(this.$root, 'data-noe-errors') || {};
         this.rows = rows.map((r) => this.hydrate(r, false));
-        this.rows.push(this.hydrate({}, true));
+        if (this.allowAdd) this.rows.push(this.hydrate({}, true));
         this.applyErrors(errors);
         for (const row of this.rows) if (!row.__phantom) this.runCompute(row);
         this.recalc();
@@ -202,7 +205,7 @@
 
       // ----- mutations -------------------------------------------------------------------------
       promote(row) {
-        if (!row.__phantom) return;
+        if (!row.__phantom || !this.allowAdd) return;
         row.__phantom = false;
         this.rows.push(this.hydrate({}, true));
         if (typeof this.hooks.onRowAdded === 'function') this.hooks.onRowAdded(row, this);
@@ -264,6 +267,8 @@
         this.emit('noe:change', { field, row });
       },
       addRow(values) {
+        // The host opted out of adding: a host-driven add is a wiring mistake, not a user action.
+        if (!this.allowAdd) return null;
         const phantom = this.rows[this.rows.length - 1];
         Object.assign(phantom, values || {});
         this.promote(phantom);
@@ -293,7 +298,7 @@
       /** Ctrl+D: copies the row below itself, keeping the caret in the same column. */
       duplicateRow(i, field) {
         const row = this.rows[i];
-        if (!row || row.__phantom || this.locked(row)) return;
+        if (!this.allowAdd || !row || row.__phantom || this.locked(row)) return;
         const copy = this.hydrate({}, false);
         for (const key of Object.keys(row)) {
           if (key.indexOf('__') !== 0) copy[key] = row[key];
@@ -309,7 +314,7 @@
       /** Ctrl+Enter: inserts an empty row above the current one. */
       insertRowAbove(i) {
         const row = this.rows[i];
-        if (!row || row.__phantom || this.locked(row)) return;
+        if (!this.allowAdd || !row || row.__phantom || this.locked(row)) return;
         const blank = this.hydrate({}, false);
         this.rows.splice(i, 0, blank);
         this.recalc();

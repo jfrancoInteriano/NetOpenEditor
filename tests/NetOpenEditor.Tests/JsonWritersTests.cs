@@ -162,4 +162,17 @@ public sealed class JsonWritersTests
         Assert.Equal("readonly", EditorConfigJsonWriter.KindName(EditorKind.ReadOnly));
         Assert.Equal("integer", EditorConfigJsonWriter.KindName(EditorKind.Integer));
     }
+
+    [Fact]
+    public void Config_CarriesAllowAdd()
+    {
+        var allowed = new EditorOptionsBuilder<TestLine>("journal").Column(l => l.Description).Build();
+        var blocked = new EditorOptionsBuilder<TestLine>("journal").Column(l => l.Description).AllowAdd(false).Build();
+
+        using var on = JsonDocument.Parse(ToJson(w => EditorConfigJsonWriter.Write(w, allowed, new EditorRenderContext(), new Dictionary<string, string>())));
+        using var off = JsonDocument.Parse(ToJson(w => EditorConfigJsonWriter.Write(w, blocked, new EditorRenderContext(), new Dictionary<string, string>())));
+
+        Assert.True(on.RootElement.GetProperty("allowAdd").GetBoolean());
+        Assert.False(off.RootElement.GetProperty("allowAdd").GetBoolean());
+    }
 }
