@@ -46,7 +46,9 @@ Igual que NetOpenGrid: `<VersionPrefix>` en `Directory.Build.props` es la versi�
 - Tras publicar crea el tag `vX.Y.Z` y un GitHub Release con el `.nupkg` y `.snupkg`.
 - Los PR solo compilan, prueban y empaquetan; no publican.
 
-Requiere el secret `NUGET_API_KEY` y el environment `nuget` en el repositorio.
+Publica con NuGet Trusted Publishing (OIDC, sin API key guardada): requiere la política en nuget.org
+(repo `NetOpenEditor`, workflow `publish.yml`, environment `nuget`), el secret `NUGET_USER` (usuario de
+nuget.org) y el environment `nuget` en el repositorio.
 
 ## Uso mínimo
 

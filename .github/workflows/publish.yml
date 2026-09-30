@@ -121,6 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write   # OIDC token for NuGet Trusted Publishing
     environment:
       name: nuget
       url: https://www.nuget.org/packages/NetOpenEditor/${{ needs.build.outputs.version }}
@@ -141,15 +142,19 @@ jobs:
           name: packages
           path: artifacts/packages
 
+      - name: NuGet login (Trusted Publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          # nuget.org profile name (not the email) of the account that owns the Trusted Publishing policy.
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push to nuget.org
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          # Short-lived key issued by the login step; no long-lived API key is stored in the repo.
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${NUGET_API_KEY:-}" ]]; then
-            echo "::error::Missing repository secret NUGET_API_KEY."
-            exit 1
-          fi
           # .snupkg symbol packages next to each .nupkg are pushed automatically.
           dotnet nuget push "artifacts/packages/*.nupkg" \
             --api-key "$NUGET_API_KEY" \
