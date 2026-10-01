@@ -13,4 +13,7 @@ public sealed class QuoteLine
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TaxRate { get; set; }
+
+    /// <summary>Always posted as a percentage, whatever unit the row is being edited in.</summary>
+    public decimal DiscountPercent { get; set; }
 }

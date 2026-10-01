@@ -90,6 +90,6 @@ public sealed class PasteBehaviorTests(SampleServerFixture server)
         Assert.Equal("2", await page.Locator(Cell(0, "Quantity")).InputValueAsync());
         Assert.Equal("50.00", await page.Locator(Cell(0, "UnitPrice")).InputValueAsync());
         // The computed column keeps quantity * price, not the pasted number.
-        Assert.Equal("100.00", await page.Locator("[data-noe-row='0'] .noe-num-text").InnerTextAsync());
+        Assert.Equal("100.00", await page.Locator(Cell(0, "LineTotal")).InputValueAsync());
     }
 }

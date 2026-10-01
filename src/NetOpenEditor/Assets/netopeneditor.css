@@ -51,6 +51,11 @@
 .noe-num { text-align: right; font-family: var(--noe-font-mono); }
 .noe-num-text, .noe-total { font-family: var(--noe-font-mono); }
 .noe-text { display: block; padding: .375rem .5rem; }
+.noe-adorn {
+  margin-left: .25rem; padding: .25rem .5rem; border: 1px solid var(--noe-border); border-radius: var(--noe-radius);
+  background: var(--noe-head-bg); color: var(--noe-head-text); font-size: .75rem; cursor: pointer; white-space: nowrap;
+}
+.noe-adorn:hover { background: var(--noe-hover-bg); }
 .noe-empty { text-align: center; color: var(--noe-muted); padding: 1rem; }
 .noe-check { width: 1rem; height: 1rem; margin: .5rem auto; display: block; }
 

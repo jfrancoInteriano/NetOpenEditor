@@ -19,5 +19,32 @@ public sealed class EditorColumn<TLine>
     public IReadOnlyList<SelectOption> Options { get; init; } = [];
     public LookupSettings? Lookup { get; init; }
 
+    /// <summary>
+    /// Renders a trailing button in the cell whose label comes from the <c>adornmentLabel</c> hook
+    /// and whose click runs <c>onAdornment</c>. It posts nothing: per-row state belongs in row.__host.
+    /// </summary>
+    public bool Adornment { get; init; }
+
+    /// <summary>
+    /// A computed column that accepts typing. It still never posts and <c>compute</c> keeps filling
+    /// it; what the user types goes to the <c>onComputedInput</c> hook, which decides what to write.
+    /// </summary>
+    public bool Editable { get; init; }
+
+    /// <summary>Remote type-ahead over a text column. The posted value is the text, not a key.</summary>
+    public SuggestSettings? Suggest { get; init; }
+
+    /// <summary>
+    /// Resolves the Select options once per render against the request's services, for lists that
+    /// depend on per-request data. Null means the fixed <see cref="Options"/> list is used.
+    /// </summary>
+    public Func<IServiceProvider, IReadOnlyList<SelectOption>>? OptionsFactory { get; init; }
+
+    /// <summary>Lowest accepted value; null means no floor. Numeric columns only.</summary>
+    public decimal? Min { get; init; }
+
+    /// <summary>Highest accepted value; null means no ceiling. Numeric columns only.</summary>
+    public decimal? Max { get; init; }
+
     public bool Posts => Kind is not EditorKind.Computed;
 }

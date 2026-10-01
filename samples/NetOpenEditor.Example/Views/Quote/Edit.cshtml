@@ -9,6 +9,16 @@
         <label>Cliente</label>
         <input class="hdr" asp-for="CustomerName" />
         <input type="hidden" asp-for="Id" />
+        <label>Moneda</label>
+        <select class="hdr" id="currency">
+            <option value="HNL">HNL</option>
+            <option value="USD">USD</option>
+        </select>
+        <label>Proveedor</label>
+        <select class="hdr" asp-for="ProviderId" id="provider">
+            <option value="PROV-A">Proveedor A</option>
+            <option value="PROV-B">Proveedor B</option>
+        </select>
     </div>
     <div class="card">
         @if (ViewData["LoadFromSource"] is true)
@@ -34,6 +44,30 @@
                 row.TaxRate = item.taxRate;
                 if (editor.num(row.Quantity) === 0) row.Quantity = 1;
             },
+            // Typing the printed total back-solves the unit price; the editor never writes the
+            // computed cell itself, so compute() stays the single owner of its value.
+            onComputedInput(row, field, value, editor) {
+                if (field !== 'LineTotal') return;
+                const total = editor.num(value);
+                const qty = editor.num(row.Quantity);
+                const taxed = 1 + editor.num(row.TaxRate) / 100;
+                if (qty > 0 && taxed > 0) {
+                    row.UnitPrice = Math.round((total / (qty * taxed)) * 10000) / 10000;
+                    row.__host.priceDerived = true;
+                }
+            },
+            // The button's label is the row's current unit, and the host owns that state.
+            adornmentLabel(row, field, editor) {
+                return row.__host.discountUnit === 'money' ? (document.getElementById('currency')?.value || 'HNL') : '%';
+            },
+            onAdornment(row, field, editor) {
+                const toMoney = row.__host.discountUnit !== 'money';
+                const base = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+                row.__host.discountUnit = toMoney ? 'money' : 'percent';
+                // Keep the posted field a percentage either way: convert what is on screen.
+                if (toMoney) row.__host.discountMoney = base * editor.num(row.DiscountPercent) / 100;
+                else row.__host.discountMoney = null;
+            },
             compute(row, editor) {
                 row.LineTotal = editor.num(row.Quantity) * editor.num(row.UnitPrice) * (1 + editor.num(row.TaxRate) / 100);
             }
@@ -45,6 +79,8 @@
         if (e.detail.id !== 'quote-lines') return;
         document.getElementById('grand-total').textContent = (e.detail.totals.LineTotal || 0).toFixed(2);
     };
+    // The currency lives outside the editor, so tell it when the label source changes.
+    document.getElementById('currency').addEventListener('change', () => NetOpenEditor.get('quote-lines').refresh());
     document.addEventListener('noe:ready', paintQuoteTotal);
     document.addEventListener('noe:change', paintQuoteTotal);
 </script>

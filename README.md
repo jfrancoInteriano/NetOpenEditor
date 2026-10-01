@@ -147,6 +147,172 @@ datos llegan por debajo de ese mínimo, `validate()` lo reporta al guardar, como
 
 Ejemplo vivo: `/receipt/edit` en `samples/NetOpenEditor.Example`.
 
+## Columna calculada editable: `Computed(...).Editable()`
+
+A veces el usuario tiene el resultado delante —el total impreso de una factura— y lo que falta es el
+dato de partida. Una columna calculada puede aceptar escritura sin dejar de ser calculada:
+
+```csharp
+.Computed("LineTotal", "Total", c => c.Decimal(2).Total().Editable())
+```
+
+**Sigue sin postearse** (no lleva `name`) y `compute` sigue siendo el único dueño de su valor. Lo que
+el usuario teclea va al hook, con el texto crudo, y **el host decide qué escribir**:
+
+```js
+NetOpenEditor.configure('quote-lines', {
+    onComputedInput(row, field, value, editor) {
+        if (field !== 'LineTotal') return;
+        const total = editor.num(value);
+        const qty = editor.num(row.Quantity);
+        if (qty > 0) row.UnitPrice = total / qty;      // se despeja el dato de partida
+    },
+    compute(row, editor) {
+        row.LineTotal = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+    }
+});
+```
+
+El editor **no** asigna `row[field]` con lo tecleado: si lo hiciera, el siguiente `recalc()` lo
+pisaría y el host y la librería se pelearían por la misma celda. Al salir, la celda muestra el valor
+recalculado con su formato, no el texto que se tecleó — así se ve de inmediato si lo que el host
+despejó cuadra con lo que se escribió.
+
+Pegar sobre una columna calculada sigue descartando el valor, editable o no: se recalcula sola.
+
+## Un control extra en la celda: `Adornment`
+
+Cuando una celda necesita algo más que su input —un botón que cambia la unidad de esa fila, por
+ejemplo— la columna declara un adorno:
+
+```csharp
+.Column(l => l.DiscountPercent, c => c.Decimal(2).Adornment())
+```
+
+El editor emite un botón al final de la celda, pero **no decide nada sobre él**: su rótulo lo
+devuelve el hook `adornmentLabel` y el clic ejecuta `onAdornment`. Sin rótulo no hay botón, así que
+la misma columna puede mostrarlo solo en algunas filas.
+
+```js
+NetOpenEditor.configure('quote-lines', {
+    adornmentLabel(row, field, editor) {
+        return row.__host.discountUnit === 'money' ? currencyCode() : '%';
+    },
+    onAdornment(row, field, editor) {
+        row.__host.discountUnit = row.__host.discountUnit === 'money' ? 'percent' : 'money';
+    }
+});
+```
+
+### `row.__host`: estado por fila que no se postea
+
+Cada fila trae `__host`, una bolsa que es del host. El editor no lee nada de ella, no la serializa y
+no la postea — ahí va lo que no es un valor de la línea: en qué unidad se está editando, un modo, una
+marca. Al duplicar una fila (`Ctrl+D`) se copia, para que la copia conserve su modo.
+
+### Cuando el rótulo depende de algo fuera del editor
+
+Si el rótulo sale de la página (un selector de moneda en la cabecera), el editor no puede observarlo.
+Avísale cuando cambie:
+
+```js
+document.getElementById('currency')
+    .addEventListener('change', () => NetOpenEditor.get('quote-lines').refresh());
+```
+
+`refresh()` vuelve a pedir los rótulos y recalcula los totales. Sin eso, las filas ya marcadas
+seguirían mostrando el rótulo anterior.
+
+## Texto con autocompletado: `Suggest`
+
+Cuando **el texto es el dato** y el buscador solo ayuda a escribirlo —pedir un artículo que quizá no
+está en el catálogo— la columna es `Suggest`, no `Lookup`:
+
+```csharp
+.Column(l => l.Description, c => c
+    .Header("Producto").Required().Placeholder("Buscar o escribir libre...")
+    .Suggest("/products/suggest", s => s
+        .LabelField("name")              // qué se escribe en la celda al elegir
+        .Display("code", "name")         // qué se ve en el desplegable
+        .MinLength(2)
+        .Param("providerId", "[name='ProviderId']")))
+```
+
+La diferencia con `Lookup` es semántica, y manda en todo lo demás:
+
+| | `Lookup` | `Suggest` |
+|---|---|---|
+| Valor posteado | la clave elegida | **el texto tecleado** |
+| Texto sin elegir nada | se revierte al salir | **se conserva y se postea** |
+| Al elegir | copia los `Companion` declarados | escribe el label y llama al hook `onSuggestionSelected` |
+| Pegar | resuelve contra el endpoint | **es texto, sin petición remota** |
+
+`LabelField` es obligatorio y no tiene valor por defecto: cada endpoint nombra su campo a su manera.
+
+El hook decide qué rellena el item elegido, que es lo que `Companion` no puede hacer —copia sin
+condiciones— cuando hay dos ids excluyentes o un campo que el usuario ya escribió:
+
+```js
+NetOpenEditor.configure('request-lines', {
+    onSuggestionSelected(row, field, item, editor) {
+        row.ProductId = item.productId || null;
+        row.ServiceId = item.serviceId || null;
+        if (!row.UnitOfMeasure) row.UnitOfMeasure = item.unitOfMeasure || '';
+    }
+});
+```
+
+Los ids van como columnas `Hidden`, así que se postean con la fila sin ocupar una celda. Ejemplo
+vivo: `/request/edit` en `samples/NetOpenEditor.Example`.
+
+## Lookup filtrado por la página: `Param`
+
+Un buscador puede estrechar sus resultados con valores que el usuario sigue cambiando —el proveedor
+de la cabecera, el almacén, la moneda— declarando parámetros que se **resuelven en cada búsqueda**:
+
+```csharp
+.Lookup("/products/lookup", lk => lk
+    .ValueField("productId").LabelField("display")
+    .Param("providerId", "[name='ProviderId']"))
+```
+
+El segundo argumento es un selector CSS: el editor lee el `value` de ese elemento justo antes de
+buscar, así que cambiar la cabecera re-filtra al instante, sin recargar ni volver a registrar nada.
+Un parámetro vacío **se omite** (un filtro vacío es "sin filtro", no "no coincide con nada").
+
+Los parámetros viajan en **las dos** rutas que consultan el endpoint: el buscador y la resolución de
+valores **pegados**. Si solo cubrieran la primera, el desplegable filtraría bien mientras un pegado
+resolvería contra la lista completa, que es justo el caso que nadie ve hasta que ya está guardado.
+
+Para valores que no están en el DOM, o que dependen de la fila, el hook `lookupParams` añade los
+suyos:
+
+```js
+NetOpenEditor.configure('quote-lines', {
+    lookupParams(row, field, editor) {
+        return { warehouseId: currentWarehouse(), lineKind: row.Kind };
+    }
+});
+```
+
+Un editor que no declara parámetros ni usa el hook envía exactamente la misma petición que antes.
+
+## Rangos numéricos: `Min` / `Max`
+
+Las columnas `Integer` y `Decimal` aceptan un rango declarado:
+
+```csharp
+.Column(l => l.Received, c => c.Decimal(2).Min(0m).Max(10m))
+```
+
+Fuera de rango, la celda queda marcada con `min` / `max` ("Mínimo 0.00", "Máximo 10.00") al salir de
+ella, y `validate()` lo bloquea al guardar. **El editor no reescribe lo que el usuario tecleó**: avisa,
+no corrige en silencio. Si necesitas ajustar el valor, o un límite que dependa de la fila (por ejemplo
+lo pendiente de cada renglón), eso sigue siendo trabajo del hook `onCellChange`.
+
+Declarar `Min`/`Max` en una columna no numérica, o un `Min` mayor que el `Max`, falla al registrar el
+editor.
+
 ## Hooks y API
 
 ```js

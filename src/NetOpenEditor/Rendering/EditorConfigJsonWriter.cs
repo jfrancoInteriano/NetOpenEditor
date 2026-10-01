@@ -40,7 +40,11 @@ public static class EditorConfigJsonWriter
             writer.WriteString("header", column.Header);
             writer.WriteBoolean("required", column.Required);
             writer.WriteNumber("decimals", column.Decimals);
+            if (column.Min is { } min) writer.WriteNumber("min", min);
+            if (column.Max is { } max) writer.WriteNumber("max", max);
             writer.WriteBoolean("total", column.Total);
+            if (column.Adornment) writer.WriteBoolean("adornment", true);
+            if (column.Editable) writer.WriteBoolean("editable", true);
             writer.WriteString("align", column.Align switch { CellAlign.End => "end", CellAlign.Center => "center", _ => "start" });
             if (column.WidthCss is null) writer.WriteNull("width"); else writer.WriteString("width", column.WidthCss);
             if (column.Placeholder is null) writer.WriteNull("placeholder"); else writer.WriteString("placeholder", column.Placeholder);
@@ -62,6 +66,30 @@ public static class EditorConfigJsonWriter
                 writer.WritePropertyName("companions");
                 writer.WriteStartObject();
                 foreach (var (posted, json) in lookup.Companions) writer.WriteString(posted, json);
+                writer.WriteEndObject();
+                writer.WritePropertyName("params");
+                writer.WriteStartObject();
+                foreach (var (name, selector) in lookup.Params) writer.WriteString(name, selector);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
+
+            if (column.Suggest is { } suggest)
+            {
+                writer.WritePropertyName("suggest");
+                writer.WriteStartObject();
+                writer.WriteString("url", suggest.Url);
+                writer.WriteString("term", suggest.TermParameter);
+                writer.WriteString("label", suggest.LabelField);
+                writer.WritePropertyName("display");
+                writer.WriteStartArray();
+                foreach (var field in suggest.DisplayFields) writer.WriteStringValue(field);
+                writer.WriteEndArray();
+                writer.WriteNumber("minLength", suggest.MinLength);
+                writer.WriteNumber("debounce", suggest.DebounceMs);
+                writer.WritePropertyName("params");
+                writer.WriteStartObject();
+                foreach (var (name, selector) in suggest.Params) writer.WriteString(name, selector);
                 writer.WriteEndObject();
                 writer.WriteEndObject();
             }
@@ -102,6 +130,7 @@ public static class EditorConfigJsonWriter
         EditorKind.Date => "date",
         EditorKind.Select => "select",
         EditorKind.Lookup => "lookup",
+        EditorKind.Suggest => "suggest",
         EditorKind.Toggle => "toggle",
         EditorKind.ReadOnly => "readonly",
         EditorKind.Computed => "computed",

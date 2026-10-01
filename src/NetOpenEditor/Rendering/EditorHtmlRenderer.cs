@@ -75,7 +75,7 @@ public sealed class EditorHtmlRenderer<TLine>
         sb.Append("""<th class="noe-th noe-th-actions" role="columnheader" scope="col"></th></tr></thead><tbody>""");
         sb.Append("""<template x-for="(row, i) in rows" :key="row.__key"><tr role="row" :aria-rowindex="i + 2" :data-noe-row="i" :class="{ 'noe-row-phantom': row.__phantom, 'noe-row-locked': locked(row), 'noe-row-invalid': hasErrors(row) }">""");
         sb.Append("""<td class="noe-td noe-td-index" role="gridcell" aria-colindex="1"><span x-text="row.__phantom ? '' : (i + 1)"></span></td>""");
-        for (var k = 0; k < visible.Count; k++) AppendCell(sb, visible[k], k + 2, id);
+        for (var k = 0; k < visible.Count; k++) AppendCell(sb, visible[k], k + 2, id, SelectOptionsFor(visible[k], context));
 
         sb.Append("""<td class="noe-td noe-td-actions" role="gridcell"><span class="noe-row-error" x-show="rowError(row)" :title="rowError(row)">!</span>""");
         sb.Append("""<button type="button" class="noe-btn-remove" x-show="canRemove(row)" @click="removeRow(i)" :title="t('remove')" :aria-label="t('remove')">""").Append(TrashSvg).Append("</button>");
@@ -96,7 +96,20 @@ public sealed class EditorHtmlRenderer<TLine>
         return sb.ToString();
     }
 
-    private static void AppendCell(StringBuilder sb, EditorColumn<TLine> column, int columnIndex, string editorId)
+    /// <summary>Options of a Select column: the fixed list, or the factory resolved against this request.</summary>
+    private static IReadOnlyList<SelectOption> SelectOptionsFor(EditorColumn<TLine> column, EditorRenderContext context)
+    {
+        if (column.OptionsFactory is not { } factory) return column.Options;
+
+        var services = context.Services
+            ?? throw new InvalidOperationException(
+                $"Column '{column.Field}' resolves its Select options per render, but this render has no services. " +
+                "Render through <netopen-editor>, or set EditorRenderContext.Services.");
+
+        return factory(services);
+    }
+
+    private static void AppendCell(StringBuilder sb, EditorColumn<TLine> column, int columnIndex, string editorId, IReadOnlyList<SelectOption> selectOptions)
     {
         var f = column.Field;
         var d = column.Decimals;
@@ -135,7 +148,7 @@ public sealed class EditorHtmlRenderer<TLine>
             case EditorKind.Select:
                 var emptyOption = column.Placeholder is null ? string.Empty : Html.Encode(column.Placeholder);
                 sb.Append($"<select class=\"noe-input\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}><option value=\"\">{emptyOption}</option>");
-                foreach (var option in column.Options)
+                foreach (var option in selectOptions)
                 {
                     sb.Append("<option value=\"").Append(Html.Encode(option.Value)).Append("\">").Append(Html.Encode(option.Label)).Append("</option>");
                 }
@@ -148,6 +161,12 @@ public sealed class EditorHtmlRenderer<TLine>
                 sb.Append($"<input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\"></div>");
                 break;
 
+            case EditorKind.Suggest:
+                // x-model, like a plain text column: what the user types is the posted value. The
+                // dropdown only offers to fill it in, and blur never rewrites it.
+                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}')\" @input=\"suggestSearch($event, i, '{f}')\" {onPaste} @keydown=\"suggestKey($event, row, i, '{f}')\" @blur=\"suggestBlur()\"{placeholder}></div>");
+                break;
+
             case EditorKind.Toggle:
                 sb.Append($"<input type=\"checkbox\" class=\"noe-check\" value=\"true\" data-noe-field=\"{f}\" {name} x-model=\"row['{f}']\" :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}>");
                 sb.Append($"<input type=\"hidden\" {name} value=\"false\">");
@@ -157,12 +176,23 @@ public sealed class EditorHtmlRenderer<TLine>
                 sb.Append($"<span class=\"noe-text\" x-text=\"row['{f}'] ?? ''\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
                 break;
 
+            case EditorKind.Computed when column.Editable:
+                // No name attribute: it takes typing but is never posted. syncNumber keeps the
+                // recomputed value on screen without overwriting the cell while it has focus.
+                sb.Append($"<input type=\"text\" inputmode=\"decimal\" class=\"noe-input noe-num\" autocomplete=\"off\" data-noe-num data-noe-decimals=\"{d}\" data-noe-field=\"{f}\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} x-effect=\"syncNumber($el, row, '{f}', {d})\" {onFocus} @input=\"onComputedInput($event, i, '{f}')\" @blur=\"onComputedBlur($event, i, '{f}', {d})\" {onKey}{placeholder}>");
+                break;
+
             case EditorKind.Computed:
                 sb.Append($"<span class=\"noe-text noe-num-text\" x-text=\"fmt(row['{f}'], {d})\"></span>");
                 break;
 
             default:
                 throw new InvalidOperationException($"Column '{f}' has kind {column.Kind}, which is not a visible cell.");
+        }
+
+        if (column.Adornment)
+        {
+            sb.Append($"<button type=\"button\" class=\"noe-adorn\" tabindex=\"-1\" x-show=\"adornmentLabel(row, '{f}')\" @mousedown.prevent @click=\"onAdornment(row, '{f}')\" :title=\"adornmentLabel(row, '{f}')\" :aria-label=\"adornmentLabel(row, '{f}')\" x-text=\"adornmentLabel(row, '{f}')\"></button>");
         }
 
         if (column.Kind is not (EditorKind.Computed or EditorKind.ReadOnly))

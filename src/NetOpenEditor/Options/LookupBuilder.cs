@@ -14,6 +14,7 @@ public sealed class LookupBuilder<TLine>
     private int _debounce = 220;
     private Func<TLine, string?>? _labelSelector;
     private readonly Dictionary<string, string> _companions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _params = new(StringComparer.Ordinal);
     private readonly List<(string Field, Func<TLine, object?> Getter)> _companionColumns = [];
 
     internal LookupBuilder(string url)
@@ -24,6 +25,22 @@ public sealed class LookupBuilder<TLine>
         }
 
         _url = url;
+    }
+
+    /// <summary>
+    /// Adds a query parameter resolved on every search from the page: <paramref name="selector"/> is
+    /// a CSS selector and its element's value is sent. Empty values are omitted. For values that are
+    /// not in the DOM, or that depend on the row, use the <c>lookupParams</c> hook instead.
+    /// </summary>
+    public LookupBuilder<TLine> Param(string name, string selector)
+    {
+        var key = Require(name, nameof(name));
+        if (!_params.TryAdd(key, Require(selector, nameof(selector))))
+        {
+            throw new EditorConfigurationException($"Lookup parameter '{key}' is declared twice.");
+        }
+
+        return this;
     }
 
     public LookupBuilder<TLine> TermParameter(string name) { _term = Require(name, nameof(name)); return this; }
@@ -70,8 +87,15 @@ public sealed class LookupBuilder<TLine>
     internal Func<TLine, string?>? LabelSelector => _labelSelector;
     internal IReadOnlyList<(string Field, Func<TLine, object?> Getter)> Companions => _companionColumns;
 
-    internal LookupSettings Build() => new()
+    internal LookupSettings Build()
     {
+        if (_params.ContainsKey(_term))
+        {
+            throw new EditorConfigurationException($"Lookup parameter '{_term}' collides with the term parameter.");
+        }
+
+        return new LookupSettings
+        {
         Url = _url,
         TermParameter = _term,
         ValueField = _value,
@@ -80,7 +104,9 @@ public sealed class LookupBuilder<TLine>
         MinLength = _minLength,
         DebounceMs = _debounce,
         Companions = new Dictionary<string, string>(_companions, StringComparer.Ordinal),
-    };
+        Params = new Dictionary<string, string>(_params, StringComparer.Ordinal),
+        };
+    }
 
     private static string Require(string value, string name)
     {

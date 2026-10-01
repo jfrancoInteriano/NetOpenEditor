@@ -212,4 +212,218 @@ public sealed class EditorOptionsBuilderTests
         Assert.False(options.AllowAdd);
         Assert.Equal(2, options.MinRows);
     }
+
+    [Fact]
+    public void MinAndMax_RoundTripOnNumericColumns()
+    {
+        var options = Builder()
+            .Column(l => l.Quantity, c => c.Integer().Min(1).Max(99))
+            .Column(l => l.DebitAmount, c => c.Decimal(2).Min(0m))
+            .Build();
+
+        var quantity = options.Columns.Single(c => c.Field == "Quantity");
+        var amount = options.Columns.Single(c => c.Field == "DebitAmount");
+
+        Assert.Equal(1m, quantity.Min);
+        Assert.Equal(99m, quantity.Max);
+        Assert.Equal(0m, amount.Min);
+        Assert.Null(amount.Max);
+    }
+
+    [Fact]
+    public void MinAndMax_DefaultToNull()
+    {
+        var options = Builder().Column(l => l.Quantity, c => c.Integer()).Build();
+
+        var quantity = options.Columns.Single(c => c.Field == "Quantity");
+        Assert.Null(quantity.Min);
+        Assert.Null(quantity.Max);
+    }
+
+    [Fact]
+    public void Min_OnANonNumericColumn_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder().Column(l => l.Description, c => c.Text().Min(1)).Build());
+
+        Assert.Contains("Description", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MinGreaterThanMax_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder().Column(l => l.Quantity, c => c.Integer().Min(10).Max(5)).Build());
+
+        Assert.Contains("Quantity", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LookupParams_RoundTripThroughBuild()
+    {
+        var options = Builder()
+            .Column(l => l.AccountId, c => c.Lookup("/accounts/lookup", lk => lk
+                .ValueField("accountId").LabelField("display")
+                .Param("providerId", "[name='ProviderId']")
+                .Param("warehouseId", "#warehouse")))
+            .Build();
+
+        var lookup = options.Columns.Single(c => c.Field == "AccountId").Lookup!;
+
+        Assert.Equal(2, lookup.Params.Count);
+        Assert.Equal("[name='ProviderId']", lookup.Params["providerId"]);
+        Assert.Equal("#warehouse", lookup.Params["warehouseId"]);
+    }
+
+    [Fact]
+    public void LookupParams_DefaultToEmpty()
+    {
+        var options = Builder()
+            .Column(l => l.AccountId, c => c.Lookup("/accounts/lookup", lk => lk.ValueField("accountId").LabelField("display")))
+            .Build();
+
+        Assert.Empty(options.Columns.Single(c => c.Field == "AccountId").Lookup!.Params);
+    }
+
+    [Fact]
+    public void LookupParam_WithTheSameNameTwice_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder()
+                .Column(l => l.AccountId, c => c.Lookup("/accounts/lookup", lk => lk
+                    .ValueField("accountId").LabelField("display")
+                    .Param("providerId", "#a")
+                    .Param("providerId", "#b")))
+                .Build());
+
+        Assert.Contains("providerId", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LookupParam_CannotShadowTheTermParameter()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder()
+                .Column(l => l.AccountId, c => c.Lookup("/accounts/lookup", lk => lk
+                    .ValueField("accountId").LabelField("display")
+                    .TermParameter("q")
+                    .Param("q", "#other")))
+                .Build());
+
+        Assert.Contains("q", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Suggest_PostsTheTypedText_NotAForeignKey()
+    {
+        var options = Builder()
+            .Column(l => l.Description, c => c.Suggest("/products/suggest", s => s.LabelField("name")))
+            .Build();
+
+        var column = options.Columns.Single(c => c.Field == "Description");
+
+        Assert.Equal(EditorKind.Suggest, column.Kind);
+        Assert.True(column.Posts);                     // the text is the data
+        Assert.Null(column.Lookup);                    // it is not a lookup in disguise
+        Assert.Equal("name", column.Suggest!.LabelField);
+        Assert.Equal("/products/suggest", column.Suggest.Url);
+    }
+
+    [Fact]
+    public void Suggest_CarriesItsOwnParamsAndThresholds()
+    {
+        var options = Builder()
+            .Column(l => l.Description, c => c.Suggest("/products/suggest", s => s
+                .LabelField("name")
+                .TermParameter("q")
+                .MinLength(2)
+                .Debounce(150)
+                .Param("providerId", "[name='ProviderId']")))
+            .Build();
+
+        var suggest = options.Columns.Single(c => c.Field == "Description").Suggest!;
+
+        Assert.Equal("q", suggest.TermParameter);
+        Assert.Equal(2, suggest.MinLength);
+        Assert.Equal(150, suggest.DebounceMs);
+        Assert.Equal("[name='ProviderId']", suggest.Params["providerId"]);
+    }
+
+    [Fact]
+    public void Suggest_NeedsALabelField()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder().Column(l => l.Description, c => c.Suggest("/products/suggest")).Build());
+
+        Assert.Contains("Description", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SuggestAndLookup_OnTheSameColumn_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder()
+                .Column(l => l.Description, c => c
+                    .Suggest("/products/suggest", s => s.LabelField("name"))
+                    .Lookup("/accounts/lookup"))
+                .Build());
+
+        Assert.Contains("Description", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Adornment_IsOffByDefault_AndRoundTrips()
+    {
+        var options = Builder()
+            .Column(l => l.Description)
+            .Column(l => l.DebitAmount, c => c.Decimal(2).Adornment())
+            .Build();
+
+        Assert.False(options.Columns.Single(c => c.Field == "Description").Adornment);
+        Assert.True(options.Columns.Single(c => c.Field == "DebitAmount").Adornment);
+    }
+
+    [Fact]
+    public void Adornment_OnAColumnWithNoControl_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder().Column(l => l.Description, c => c.Hidden().Adornment()).Build());
+
+        Assert.Contains("Description", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditableComputed_StillNeverPosts()
+    {
+        var options = Builder()
+            .Column(l => l.Quantity)
+            .Computed("LineTotal", "Total", c => c.Decimal(2).Editable())
+            .Build();
+
+        var computed = options.Columns.Single(c => c.Field == "LineTotal");
+
+        Assert.True(computed.Editable);
+        Assert.Equal(EditorKind.Computed, computed.Kind);
+        Assert.False(computed.Posts);          // the point: it takes input but is never posted
+    }
+
+    [Fact]
+    public void Computed_IsNotEditableByDefault()
+    {
+        var options = Builder()
+            .Column(l => l.Quantity)
+            .Computed("LineTotal", "Total", c => c.Decimal(2))
+            .Build();
+
+        Assert.False(options.Columns.Single(c => c.Field == "LineTotal").Editable);
+    }
+
+    [Fact]
+    public void Editable_OnANonComputedColumn_Throws()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder().Column(l => l.DebitAmount, c => c.Decimal(2).Editable()).Build());
+
+        Assert.Contains("DebitAmount", ex.Message, StringComparison.Ordinal);
+    }
 }

@@ -25,13 +25,13 @@ public static class SampleCatalog
 
     public static readonly IReadOnlyList<ProductItem> Products =
     [
-        new(Id(1), "P-001", "Laptop", 1200m, 15m),
-        new(Id(2), "P-002", "Mouse", 25.5m, 15m),
-        new(Id(3), "P-003", "Monitor", 340m, 15m),
-        new(Id(4), "P-004", "Servicio de instalación", 80m, 0m),
+        new(Id(1), "P-001", "Laptop", 1200m, 15m, "PROV-A"),
+        new(Id(2), "P-002", "Mouse", 25.5m, 15m, "PROV-A"),
+        new(Id(3), "P-003", "Monitor", 340m, 15m, "PROV-B"),
+        new(Id(4), "P-004", "Servicio de instalación", 80m, 0m, "PROV-B"),
     ];
 
-    public sealed record ProductItem(Guid ProductId, string Code, string Name, decimal Price, decimal TaxRate)
+    public sealed record ProductItem(Guid ProductId, string Code, string Name, decimal Price, decimal TaxRate, string ProviderId)
     {
         public string Display => $"{Code} - {Name}";
     }

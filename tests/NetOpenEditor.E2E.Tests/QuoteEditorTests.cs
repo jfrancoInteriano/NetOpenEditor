@@ -23,24 +23,28 @@ public sealed class QuoteEditorTests(SampleServerFixture server)
         Assert.Equal("1", await page.Locator(Cell(0, "Quantity")).InputValueAsync());
         Assert.Equal("1200.00", await page.Locator(Cell(0, "UnitPrice")).InputValueAsync());
         Assert.Equal("15.00", await page.Locator(Cell(0, "TaxRate")).InputValueAsync());
-        Assert.Equal("1380.00", await page.Locator("[data-noe-row='0'] .noe-num-text").InnerTextAsync());
+        Assert.Equal("1380.00", await page.Locator(Cell(0, "LineTotal")).InputValueAsync());
         Assert.Equal("1380.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
 
         await page.Locator(Cell(0, "Quantity")).FillAsync("3");
         await page.Keyboard.PressAsync("Tab");
 
-        Assert.Equal("4140.00", await page.Locator("[data-noe-row='0'] .noe-num-text").InnerTextAsync());
+        Assert.Equal("4140.00", await page.Locator(Cell(0, "LineTotal")).InputValueAsync());
         Assert.Equal("4140.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
         Assert.Equal("4140.00", await page.Locator("#grand-total").InnerTextAsync());
     }
 
     [Fact]
-    public async Task IntegerColumn_DropsDecimalSeparator()
+    public async Task IntegerColumn_TruncatesTheDecimalPart_WithoutClosingTheDigits()
     {
         var page = await OpenAsync();
 
+        // "2.7" used to become "27": the separator was deleted and the digits closed up, so a
+        // quantity silently turned into ten times what was typed.
         await page.Locator(Cell(0, "Quantity")).FillAsync("2.7");
-        Assert.Equal("27", await page.Locator(Cell(0, "Quantity")).InputValueAsync());
+        await page.Keyboard.PressAsync("Tab");
+
+        Assert.Equal("2", await page.Locator(Cell(0, "Quantity")).InputValueAsync());
     }
 
     [Fact]
@@ -60,5 +64,20 @@ public sealed class QuoteEditorTests(SampleServerFixture server)
         Assert.Equal(4, line.GetProperty("Quantity").GetInt32());
         Assert.Equal("P-002", line.GetProperty("ProductCode").GetString());
         Assert.False(line.TryGetProperty("LineTotal", out _));
+    }
+
+    [Fact]
+    public async Task IntegerColumn_TypedCharacterByCharacter_LeavesNoTrailingSeparator()
+    {
+        var page = await OpenAsync();
+
+        // Typing digit by digit keeps "2." while editing — that dangling dot is what stops the next
+        // keystroke from closing up into "27" — but it must be gone once the cell loses focus.
+        await page.Locator(Cell(0, "Quantity")).ClickAsync();
+        await page.Locator(Cell(0, "Quantity")).PressSequentiallyAsync("2.7");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+
+        Assert.Equal("2", await page.Locator(Cell(0, "Quantity")).InputValueAsync());
     }
 }

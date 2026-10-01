@@ -59,11 +59,11 @@ public sealed class AssetsTests
     [Fact]
     public void CssFilePrefix_AppliesOnlyWithCssPath()
     {
-        var options = new NetOpenEditorAssetOptions { CssFilePrefix = "erp-" };
+        var options = new NetOpenEditorAssetOptions { CssFilePrefix = "acme-" };
         Assert.Contains("/_noe/netopeneditor.css", EditorAssetTags.Head(options), StringComparison.Ordinal);
 
         options.CssPath = "/css";
-        Assert.Contains("/css/erp-default.css", EditorAssetTags.Head(options), StringComparison.Ordinal);
+        Assert.Contains("/css/acme-default.css", EditorAssetTags.Head(options), StringComparison.Ordinal);
     }
 
     [Fact]

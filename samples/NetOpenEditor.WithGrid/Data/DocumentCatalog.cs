@@ -3,7 +3,7 @@ using NetOpenEditor.WithGrid.Models;
 namespace NetOpenEditor.WithGrid.Data;
 
 /// <summary>
-/// In-memory stand-in for the module repositories the ERP would use. Mutable on purpose: saving the
+/// In-memory stand-in for the module repositories the host app would use. Mutable on purpose: saving the
 /// lines of a document updates its grid total, which is how the demo shows the binding round-trip.
 /// </summary>
 public static class DocumentCatalog

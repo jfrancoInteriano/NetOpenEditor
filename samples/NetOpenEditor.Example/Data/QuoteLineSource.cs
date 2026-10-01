@@ -4,7 +4,7 @@ using NetOpenEditor.Runtime;
 
 namespace NetOpenEditor.Example.Data;
 
-/// <summary>Stand-in for a module repository: the editor pulls its lines from here, like the ERP grids do.</summary>
+/// <summary>Stand-in for a module repository: the editor pulls its lines from here, like the host app grids do.</summary>
 public sealed class QuoteLineSource : IEditorLineSource<QuoteLine>
 {
     public ValueTask<IReadOnlyList<QuoteLine>> LoadAsync(string key, CancellationToken cancellationToken = default)

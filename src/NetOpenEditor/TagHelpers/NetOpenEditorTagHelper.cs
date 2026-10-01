@@ -65,6 +65,7 @@ public sealed class NetOpenEditorTagHelper : TagHelper
             NamePrefix = string.IsNullOrWhiteSpace(NamePrefix) ? "Lines" : NamePrefix,
             Errors = ModelStateErrors.Collect(ViewContext.ViewData?.ModelState ?? ViewContext.ModelState, string.IsNullOrWhiteSpace(NamePrefix) ? "Lines" : NamePrefix),
             HiddenColumns = hidden,
+            Services = http.RequestServices,
         };
 
         var hasKey = !string.IsNullOrWhiteSpace(Key);

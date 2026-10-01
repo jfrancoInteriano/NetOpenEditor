@@ -20,6 +20,8 @@
     required: 'Required',
     minRows: 'At least {n} line(s) required',
     'rows.empty': 'No lines',
+    min: 'Minimum {n}',
+    max: 'Maximum {n}',
     'paste.truncated': 'Only the first {n} rows were pasted.',
     'lookup.notFound': "'{term}' was not found",
     'lookup.ambiguous': "'{term}' matches more than one item"
@@ -61,6 +63,8 @@
       focusCell: (i, field) => inst.focusCell(i, field),
       validate: () => inst.validate(),
       recalc: () => inst.recalc(),
+      /** Re-reads anything the editor cannot observe: adornment labels that depend on the page. */
+      refresh: () => { inst.adornVersion++; inst.recalc(); },
       get totals() { return inst.totals; },
       num: (v) => inst.num(v),
       fmt: (v, d) => inst.fmt(v, d)
@@ -96,12 +100,10 @@
     let s = String(text).replace(',', '.').replace(/[^0-9.\-]/g, '');
     const negative = s.startsWith('-');
     s = s.replace(/-/g, '');
-    if (decimals === 0) {
-      s = s.replace(/\./g, '');
-    } else {
-      const dot = s.indexOf('.');
-      if (dot >= 0) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '').slice(0, decimals);
-    }
+    // Keep the separator and drop the digits past it. Deleting the dot instead closed the digits
+    // up, so "1.5" silently became 15 in an integer column.
+    const dot = s.indexOf('.');
+    if (dot >= 0) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '').slice(0, decimals);
     return (negative ? '-' : '') + s;
   };
 
@@ -117,8 +119,9 @@
       hooks: {},
       totals: {},
       formError: '',
+      adornVersion: 0,   // bumped by refresh(): lets labels follow state outside the editor
       focusSnapshot: null,
-      lookup: { open: false, rowKey: null, field: null, items: [], active: -1, loading: false, style: '' },
+      lookup: { open: false, rowKey: null, field: null, items: [], active: -1, loading: false, style: '', mode: 'lookup' },
 
       // ----- lifecycle -------------------------------------------------------------------------
       init() {
@@ -157,7 +160,9 @@
       },
 
       hydrate(raw, phantom) {
-        const row = { __key: 'r' + (++keySeq), __phantom: phantom, __errors: {}, __labels: Object.assign({}, raw.__labels || {}) };
+        // __host: a bag the host owns for per-row state that must never be posted (a unit toggle,
+        // a mode, a flag). The editor reads nothing from it and never serializes it.
+        const row = { __key: 'r' + (++keySeq), __phantom: phantom, __errors: {}, __labels: Object.assign({}, raw.__labels || {}), __host: {} };
         for (const c of this.columns) {
           const v = raw[c.field];
           row[c.field] = v === undefined ? this.defaultFor(c) : v;
@@ -242,6 +247,25 @@
           this.afterChange(row, field);
         }
         e.target.value = fmt(row[field], decimals);
+        if (!row.__phantom) this.checkRange(row, field);
+      },
+
+      /** Message when a value falls outside the column's declared range, or null. */
+      rangeError(c, value) {
+        if (!c) return null;
+        const n = toNumber(value);
+        if (n === null) return null;
+        if (c.min !== undefined && n < c.min) return this.t('min', { n: this.fmt(c.min, c.decimals) });
+        if (c.max !== undefined && n > c.max) return this.t('max', { n: this.fmt(c.max, c.decimals) });
+        return null;
+      },
+
+      /** Flags the cell when it leaves the range. It never rewrites the value: the user sees what they typed. */
+      checkRange(row, field) {
+        const problem = this.rangeError(this.colFor(field), row[field]);
+        if (problem) row.__errors[field] = [problem];
+        else if (row.__errors && row.__errors[field]) delete row.__errors[field];
+        return !problem;
       },
       afterChange(row, field) {
         if (row.__errors && row.__errors[field]) delete row.__errors[field];
@@ -304,6 +328,7 @@
           if (key.indexOf('__') !== 0) copy[key] = row[key];
         }
         copy.__labels = Object.assign({}, row.__labels || {});
+        copy.__host = Object.assign({}, row.__host || {});   // a copy keeps the row's mode
         this.rows.splice(i + 1, 0, copy);
         this.runCompute(copy);
         this.recalc();
@@ -322,11 +347,164 @@
         this.$nextTick(() => this.focusCell(i, this.firstEditableField()));
       },
 
+      // ----- editable computed ----------------------------------------------------------------
+      /**
+       * Typing in an editable computed cell. The editor deliberately does NOT write row[field]:
+       * compute() owns that value, so assigning it here would be undone on the next recalculation.
+       * The host receives the raw text and decides what to write on the row.
+       */
+      onComputedInput(e, i, field) {
+        const row = this.rows[i];
+        if (!row || this.locked(row)) return;
+        if (row.__phantom) this.promote(row);
+        if (typeof this.hooks.onComputedInput === 'function') {
+          this.hooks.onComputedInput(row, field, e.target.value, this);
+        }
+        this.runCompute(row);
+        this.recalc();
+        this.emit('noe:change', { field, row });
+      },
+
+      /** Leaving the cell shows the recomputed value, formatted, not the raw text typed into it. */
+      onComputedBlur(e, i, field, decimals) {
+        const row = this.rows[i];
+        if (row) e.target.value = fmt(row[field], decimals);
+      },
+
+      // ----- cell adornment -------------------------------------------------------------------
+      /** Label of a cell's trailing button, from the host. No label means no button. */
+      adornmentLabel(row, field) {
+        // Reading it registers the dependency, so refresh() repaints labels that come from the page.
+        void this.adornVersion;
+        if (typeof this.hooks.adornmentLabel !== 'function') return '';
+        const label = this.hooks.adornmentLabel(row, field, this);
+        return label === null || label === undefined ? '' : String(label);
+      },
+
+      /** The host decides what the button does; the editor only re-renders afterwards. */
+      onAdornment(row, field) {
+        if (this.locked(row) || typeof this.hooks.onAdornment !== 'function') return;
+        this.hooks.onAdornment(row, field, this);
+        this.runCompute(row);
+        this.recalc();
+        this.emit('noe:change', { field, row });
+      },
+
+      // ----- suggest (text column with a remote type-ahead) -----------------------------------
+      /** The cell already holds the typed text (x-model); this only drives the dropdown. */
+      suggestSearch(e, i, field) {
+        const row = this.rows[i];
+        const col = this.colFor(field);
+        if (!row || !col || !col.suggest || this.locked(row)) return;
+
+        // Typing is a plain edit first: it promotes the phantom row and runs the change hooks,
+        // exactly like a text column. The dropdown is only what happens on top.
+        this.onInput(i, field);
+
+        const cfg = col.suggest;
+        const tr = transient(this.id);
+        const term = e.target.value.trim();
+        tr.inputEl = e.target;
+        this.lookup.rowKey = row.__key;
+        this.lookup.field = field;
+        this.lookup.mode = 'suggest';
+        clearTimeout(tr.timer);
+        if (term.length < (cfg.minLength || 0)) { this.lookupClose(); return; }
+        tr.timer = setTimeout(() => this.suggestFetch(cfg, term, row, field), cfg.debounce === undefined ? 220 : cfg.debounce);
+      },
+
+      async suggestFetch(cfg, term, row, field) {
+        const tr = transient(this.id);
+        const seq = ++tr.seq;
+        if (tr.abort) tr.abort.abort();
+        tr.abort = new AbortController();
+        this.lookup.loading = true;
+        this.lookup.open = true;
+        this.lookup.items = [];
+        this.lookup.active = -1;
+        this.lookupReposition();
+
+        let items = [];
+        try {
+          const resp = await fetch(this.lookupUrl(cfg, term, row, field), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            credentials: 'same-origin',
+            signal: tr.abort.signal
+          });
+          const data = resp.ok ? await resp.json() : [];
+          items = Array.isArray(data) ? data : [];
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+          console.error('[netopeneditor] suggest failed', err);
+        }
+        if (seq !== tr.seq) return;
+        this.lookup.loading = false;
+        if (document.activeElement !== tr.inputEl) { this.lookupClose(); return; }
+        this.lookup.items = items;
+        this.lookup.active = items.length ? 0 : -1;
+        this.lookupReposition();
+      },
+
+      /** Picking writes the label into the cell and lets the host decide what the item fills in. */
+      suggestPick(k) {
+        const lk = this.lookup;
+        const item = lk.items[k];
+        if (!item) return;
+        const row = this.rows.find((r) => r.__key === lk.rowKey);
+        const field = lk.field;
+        const col = this.colFor(field);
+        if (!row || !col || !col.suggest) return;
+
+        const label = item[col.suggest.label];
+        row[field] = label === undefined || label === null ? '' : String(label);
+        const tr = transient(this.id);
+        if (tr.inputEl) tr.inputEl.value = row[field];
+        if (row.__phantom) this.promote(row);
+        // Companion copies unconditionally; here the host writes, so it can keep what the user typed.
+        if (typeof this.hooks.onSuggestionSelected === 'function') this.hooks.onSuggestionSelected(row, field, item, this);
+        this.lookupClose();
+        this.afterChange(row, field);
+      },
+
+      /** Leaving the cell only hides the dropdown: text that matched nothing is a valid answer. */
+      suggestBlur() {
+        const tr = transient(this.id);
+        clearTimeout(tr.timer);
+        tr.timer = setTimeout(() => this.lookupClose(), 150);
+      },
+
+      // ----- lookup url -----------------------------------------------------------------------
+      /**
+       * Builds a lookup URL. Declared params are read from the page on every search, so a picker
+       * follows a header field the user is still changing; the lookupParams hook can add more,
+       * including values that depend on the row. An editor that declares neither sends the same
+       * request it always did.
+       */
+      lookupUrl(cfg, term, row, field) {
+        const parts = [encodeURIComponent(cfg.term || 'term') + '=' + encodeURIComponent(term)];
+        const extra = {};
+
+        for (const [name, selector] of Object.entries(cfg.params || {})) {
+          const el = document.querySelector(selector);
+          extra[name] = el ? el.value : null;
+        }
+        if (typeof this.hooks.lookupParams === 'function') {
+          Object.assign(extra, this.hooks.lookupParams(row, field, this) || {});
+        }
+
+        for (const [name, value] of Object.entries(extra)) {
+          // An empty filter is "no filter": sending name= would narrow the search to nothing.
+          if (value === null || value === undefined || value === '') continue;
+          parts.push(encodeURIComponent(name) + '=' + encodeURIComponent(value));
+        }
+
+        return cfg.url + (cfg.url.includes('?') ? '&' : '?') + parts.join('&');
+      },
+
       // ----- pasted lookups -------------------------------------------------------------------
       /** Fetches the lookup endpoint for one term, outside the picker's abort/sequence state. */
-      async lookupResolveFetch(cfg, term) {
-        const url = cfg.url + (cfg.url.includes('?') ? '&' : '?')
-          + encodeURIComponent(cfg.term || 'term') + '=' + encodeURIComponent(term);
+      async lookupResolveFetch(cfg, term, row, field) {
+        const url = this.lookupUrl(cfg, term, row, field);
         try {
           const resp = await fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -386,7 +564,7 @@
             if (!cfg) continue;
 
             const tooShort = job.text.length < (cfg.minLength || 0);
-            const items = tooShort ? [] : await this.lookupResolveFetch(cfg, job.text);
+            const items = tooShort ? [] : await this.lookupResolveFetch(cfg, job.text, job.cells[0], job.field);
             const matches = this.lookupExactMatches(cfg, job.text, items);
 
             for (const row of job.cells) {
@@ -431,6 +609,8 @@
         if (!c || NON_EDITABLE.has(c.kind)) return undefined;
         // A lookup cell cannot take a raw string: onPaste queues it and resolves it remotely.
         if (c.kind === 'lookup') return undefined;
+        // A suggest column posts text, so a pasted value needs no remote resolution.
+        if (c.kind === 'suggest') return String(raw === null || raw === undefined ? '' : raw).trim();
         const text = String(raw === null || raw === undefined ? '' : raw).trim();
         switch (c.kind) {
           case 'integer': {
@@ -610,9 +790,13 @@
         this.rows.forEach((row, i) => {
           if (row.__phantom) return;
           for (const c of this.columns) {
-            if (!c.required) continue;
-            if (this.isEmptyValue(row[c.field])) {
+            if (c.required && this.isEmptyValue(row[c.field])) {
               row.__errors[c.field] = [this.t('required')];
+              ok = false;
+              if (!first) first = { i, field: c.field };
+              continue;
+            }
+            if (!this.checkRange(row, c.field)) {
               ok = false;
               if (!first) first = { i, field: c.field };
             }
@@ -647,6 +831,7 @@
       // ----- lookup ----------------------------------------------------------------------------
       lookupText(row, field) { return (row && row.__labels && row.__labels[field]) || ''; },
       lookupOpen(e, row, field) { this.lookupSearch(e, row, field); },
+      suggestKey(e, row, i, field) { this.lookupKey(e, row, i, field); },
       lookupSearch(e, row, field) {
         const col = this.colFor(field);
         if (!col || !col.lookup || this.locked(row)) return;
@@ -673,7 +858,8 @@
 
         let items = [];
         try {
-          const url = cfg.url + (cfg.url.includes('?') ? '&' : '?') + encodeURIComponent(cfg.term || 'term') + '=' + encodeURIComponent(term);
+          const row = this.rows.find((r) => r.__key === this.lookup.rowKey);
+          const url = this.lookupUrl(cfg, term, row, this.lookup.field);
           const resp = await fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
             credentials: 'same-origin',
@@ -717,6 +903,7 @@
         this.onKey(e, i, field);
       },
       lookupPick(k) {
+        if (this.lookup.mode === 'suggest') { this.suggestPick(k); return; }
         const lk = this.lookup;
         const item = lk.items[k];
         if (!item) return;
@@ -783,7 +970,7 @@
       },
       lookupDisplay(item) {
         const col = this.colFor(this.lookup.field);
-        const cfg = col && col.lookup;
+        const cfg = col && (this.lookup.mode === 'suggest' ? col.suggest : col.lookup);
         if (!cfg) return [];
         const fields = cfg.display && cfg.display.length ? cfg.display : [cfg.label];
         return fields.map((f) => (item[f] === undefined || item[f] === null ? '' : String(item[f])));

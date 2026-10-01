@@ -14,6 +14,8 @@ public sealed class ReceiptLine
     public decimal Received { get; set; }
 
     public string? Batch { get; set; }
+
+    public string? TaxCode { get; set; }
 }
 
 public sealed class ReceiptForm

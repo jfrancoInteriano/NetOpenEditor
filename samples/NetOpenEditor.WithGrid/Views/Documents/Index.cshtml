@@ -72,7 +72,7 @@
         document.addEventListener('noe:ready', paintTotal);
         document.addEventListener('noe:change', paintTotal);
 
-        // Saving posts the very same names the ERP would bind: lines[i].Field.
+        // Saving posts the very same names the host app would bind: lines[i].Field.
         document.addEventListener('submit', async (e) => {
             const form = e.target.closest('form.doc-editor');
             if (!form) return;

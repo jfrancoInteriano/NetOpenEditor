@@ -9,5 +9,7 @@ public sealed class QuoteForm
 
     [Required(ErrorMessage = "El cliente es requerido")]
     public string? CustomerName { get; set; }
+    public string? ProviderId { get; set; } = "PROV-A";
+
     public List<QuoteLine> Lines { get; set; } = [];
 }

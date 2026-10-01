@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using NetOpenEditor.Columns;
@@ -160,5 +161,58 @@ public sealed class EditorHtmlRendererTests
 
         using var errors = Script(html, "data-noe-errors");
         Assert.Equal("Malo", errors.RootElement.GetProperty("Lines[0].DebitAmount")[0].GetString());
+    }
+
+    [Fact]
+    public void SelectOptions_CanBeResolvedPerRender()
+    {
+        var options = new EditorOptionsBuilder<TestLine>("journal")
+            .Column(l => l.Description, c => c.Select(sp => sp.GetRequiredService<FakeTaxes>().Current))
+            .Build();
+        var renderer = new EditorHtmlRenderer<TestLine>(options, new NetOpenEditorLocalizationOptions().Effective);
+
+        var first = renderer.Render([], new EditorRenderContext { Services = Services("IVA 15") });
+        var second = renderer.Render([], new EditorRenderContext { Services = Services("Exento") });
+
+        Assert.Contains("IVA 15", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exento", first, StringComparison.Ordinal);
+        Assert.Contains("Exento", second, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StaticSelectOptions_AreUnchanged()
+    {
+        var options = new EditorOptionsBuilder<TestLine>("journal")
+            .Column(l => l.Description, c => c.Select([new SelectOption("a", "Alfa")]))
+            .Build();
+        var renderer = new EditorHtmlRenderer<TestLine>(options, new NetOpenEditorLocalizationOptions().Effective);
+
+        // No services needed: an editor that does not use the factory behaves exactly as before.
+        Assert.Contains("Alfa", renderer.Render([], new EditorRenderContext()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AResolvedSelect_WithoutRequestServices_ThrowsNamingTheColumn()
+    {
+        var options = new EditorOptionsBuilder<TestLine>("journal")
+            .Column(l => l.Description, c => c.Select(sp => sp.GetRequiredService<FakeTaxes>().Current))
+            .Build();
+        var renderer = new EditorHtmlRenderer<TestLine>(options, new NetOpenEditorLocalizationOptions().Effective);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => renderer.Render([], new EditorRenderContext()));
+
+        Assert.Contains("Description", ex.Message, StringComparison.Ordinal);
+    }
+
+    private static IServiceProvider Services(string label)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new FakeTaxes([new SelectOption("t", label)]));
+        return services.BuildServiceProvider();
+    }
+
+    private sealed class FakeTaxes(IReadOnlyList<SelectOption> current)
+    {
+        public IReadOnlyList<SelectOption> Current { get; } = current;
     }
 }

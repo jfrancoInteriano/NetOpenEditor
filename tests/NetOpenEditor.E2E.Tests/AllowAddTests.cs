@@ -137,4 +137,59 @@ public sealed class AllowAddTests(SampleServerFixture server)
         Assert.Equal(0, await page.Locator("[data-noe-row]").CountAsync());
         Assert.Equal("Sin líneas", await page.Locator(".noe-row-empty").InnerTextAsync());
     }
+
+    [Fact]
+    public async Task AValueAboveMax_FlagsTheCell_WithoutRewritingIt()
+    {
+        var page = await OpenAsync();
+
+        await page.Locator(Cell(0, "Received")).FillAsync("25");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+
+        // The typed value stays: the editor reports, it does not silently clamp.
+        Assert.Equal("25.00", await page.Locator(Cell(0, "Received")).InputValueAsync());
+        Assert.Contains("10", await page.Locator("[data-noe-row='0'] .noe-error:visible").First.InnerTextAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AValueInsideTheRange_ClearsTheFlag_AndValidatePasses()
+    {
+        var page = await OpenAsync();
+        await page.Locator(Cell(0, "Received")).FillAsync("25");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForSelectorAsync("[data-noe-row='0'] .noe-error:visible");
+
+        await page.Locator(Cell(0, "Received")).FillAsync("4");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+
+        Assert.Equal(0, await page.Locator("[data-noe-row='0'] .noe-error:visible").CountAsync());
+        Assert.True(await page.EvaluateAsync<bool>("() => NetOpenEditor.get('receipt-lines').validate()"));
+    }
+
+    [Fact]
+    public async Task ValidateFails_WhenAValueIsOutOfRange()
+    {
+        var page = await OpenAsync();
+
+        await page.Locator(Cell(1, "Received")).FillAsync("99");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(200);
+
+        Assert.False(await page.EvaluateAsync<bool>("() => NetOpenEditor.get('receipt-lines').validate()"));
+    }
+
+    [Fact]
+    public async Task SelectOptions_AreResolvedPerRequest()
+    {
+        // Same editor, same process, two requests: the option list follows the request's data.
+        var full = await server.NewPageAsync("/receipt/edit");
+        var reduced = await server.NewPageAsync("/receipt/edit?taxes=reduced");
+
+        Assert.Equal(3, await full.Locator("[data-noe-row='0'] [data-noe-field='TaxCode'] option:not([value=''])").CountAsync());
+        Assert.Equal(2, await reduced.Locator("[data-noe-row='0'] [data-noe-field='TaxCode'] option:not([value=''])").CountAsync());
+        Assert.Contains("ISV 18%", await full.Locator("[data-noe-row='0'] [data-noe-field='TaxCode']").InnerTextAsync(), StringComparison.Ordinal);
+        Assert.DoesNotContain("ISV 18%", await reduced.Locator("[data-noe-row='0'] [data-noe-field='TaxCode']").InnerTextAsync(), StringComparison.Ordinal);
+    }
 }

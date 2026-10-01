@@ -1,0 +1,35 @@
+@model RequestForm
+@{
+    ViewData["Title"] = "Solicitud";
+}
+<h1>Solicitud de compra</h1>
+<p class="muted">
+    La celda <strong>Producto</strong> postea el texto que escribes (<code>Suggest</code>): el
+    buscador solo ofrece rellenarlo. Pedir algo que no está en el catálogo es válido.
+</p>
+<form method="post" id="requestForm">
+    <div class="card">
+        <div asp-validation-summary="All"></div>
+        <label>Proveedor</label>
+        <select class="hdr" asp-for="ProviderId" id="provider">
+            <option value="PROV-A">Proveedor A</option>
+            <option value="PROV-B">Proveedor B</option>
+        </select>
+    </div>
+    <div class="card">
+        <netopen-editor editor-id="request-lines" rows="Model.Lines" name-prefix="Lines" />
+    </div>
+    <button type="submit" class="btn" id="save">Guardar solicitud</button>
+</form>
+<script>
+    document.addEventListener('alpine:init', () => {
+        NetOpenEditor.configure('request-lines', {
+            // The host decides what the picked item fills in: ids are exclusive and typed values win.
+            onSuggestionSelected(row, field, item, editor) {
+                row.ProductId = item.productId || null;
+                row.ServiceId = item.serviceId || null;
+                if (!row.UnitOfMeasure) row.UnitOfMeasure = item.unitOfMeasure || '';
+            }
+        });
+    });
+</script>
