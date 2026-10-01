@@ -14,7 +14,8 @@ public sealed class QuotePageTests : IClassFixture<SampleAppFactory>
         var html = await _client.GetStringAsync("/quote/edit");
 
         Assert.Contains("data-noe-id=\"quote-lines\"", html);
-        Assert.Contains("x-text=\"fmt(row['LineTotal'], 2)\"", html);
+        // Editable now, so it renders an input — the point is that it still carries no name.
+        Assert.Contains("data-noe-field=\"LineTotal\"", html);
         Assert.DoesNotContain("nameFor(i, 'LineTotal')", html);
         Assert.Contains("data-noe-total=\"LineTotal\"", html);
     }
