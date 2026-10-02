@@ -119,6 +119,27 @@ El controller recibe `List<JournalLine> Lines` bindeada por índice, exactamente
 
 TagHelper: `editor-id`, `rows`, `name-prefix` (default `Lines`), `hide-columns="A,B"` (se postean como hidden).
 
+### Ocultar una columna mientras el formulario está abierto
+
+`hide-columns` se resuelve al renderizar: es para configuración, no para un control que el usuario
+prende y apaga. Para eso cada columna se nombra en los tres lugares que ocupa —`<th>`, `<td>` y la
+celda del pie— con `data-noe-col`, así que una sola regla CSS la saca completa y la tabla no se
+desalinea:
+
+```js
+const style = document.createElement('style');
+document.head.appendChild(style);
+function setBonusMode(on) {
+    style.textContent = on ? '' : "[data-noe-col='BonusQuantity'] { display: none }";
+}
+```
+
+Los inputs **siguen en el DOM y siguen posteando**: apagar el modo y volver a prenderlo no pierde lo
+ya capturado. Si además querés que no se postee, limpiá los valores vos mismo antes de ocultar.
+
+`data-noe-field` sigue siendo del control (el `input`, el `select`, el `span`), así que un
+`querySelector('[data-noe-field="X"]')` del host sigue devolviendo un solo elemento.
+
 ## Filas fijas: `AllowAdd(false)`
 
 Por defecto el editor mantiene una fila vacía al final que se vuelve real en cuanto el usuario
@@ -266,6 +287,28 @@ La caja **no cambia de significado**: en modo dinero se teclea dinero y se sigue
 lo posteado sea el porcentaje equivalente. Una columna `Hidden` o `ReadOnly` sigue rechazando
 `Adornment()` —no renderiza control donde ponerlo—, y una `Computed` sin `Editable()` también.
 
+## El tooltip de una celda: `cellTitle`
+
+Por defecto una celda de texto se muestra entera al pasar el mouse —`title` es su propio valor— y las
+demás no llevan tooltip. Cuando el texto útil **se deriva de la fila**, lo devuelve el host:
+
+```js
+NetOpenEditor.configure('receipt-lines', {
+    cellTitle(row, field, editor) {
+        if (field !== 'Received') return;                 // nada: queda el comportamiento por defecto
+        const pendiente = editor.num(row.Ordered) - editor.num(row.Received);
+        return `Pendiente por recibir: ${pendiente.toFixed(2)}`;
+    }
+});
+```
+
+- Se lee **dentro del binding**, así que el tooltip sigue a la fila: cambia con cada tecla de
+  cualquier campo que intervenga, en vez de quedarse con un número viejo.
+- Devolver `undefined` o `null` deja el default de esa celda; devolver `''` la deja sin tooltip.
+- Vale para todas las celdas: texto, numéricas, fecha, selector, lookup, suggest y calculadas.
+- `refresh()` también repinta estos títulos, igual que los rótulos de adorno, para cuando el texto
+  depende de algo de la página que el editor no observa.
+
 ## Texto con autocompletado: `Suggest`
 
 Cuando **el texto es el dato** y el buscador solo ayuda a escribirlo —pedir un artículo que quizá no
@@ -362,9 +405,11 @@ editor.
 NetOpenEditor.configure(id, {
   onCellChange(row, field, editor), compute(row, editor), totals(rows, editor) => ({ Field: n }),
   canRemove(row, editor), isLocked(row, editor), onRowAdded(row, editor), onRowRemoved(row, editor),
-  onLookupSelected(row, field, item, editor)
+  onLookupSelected(row, field, item, editor), lookupParams(row, field, editor),
+  onComputedInput(row, field, value, editor), adornmentLabel(row, field, editor),
+  onAdornment(row, field, editor), cellTitle(row, field, editor)
 });
-const ed = NetOpenEditor.get(id);   // rows(), addRow(values), removeRow(i), set(row, field, v), focusCell(i, field), validate(), recalc(), totals, num(v), fmt(v, d)
+const ed = NetOpenEditor.get(id);   // rows(), addRow(values), removeRow(i), set(row, field, v), focusCell(i, field), validate(), recalc(), refresh(), totals, num(v), fmt(v, d)
 ```
 Eventos DOM (burbujean): `noe:ready`, `noe:change` con `detail = { id, editor, rows, totals }`.
 

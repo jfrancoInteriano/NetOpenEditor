@@ -64,7 +64,10 @@ public sealed class EditorHtmlRenderer<TLine>
         sb.Append("""<table class="noe-table" role="grid" :aria-rowcount="count() + 1"><thead><tr role="row" aria-rowindex="1"><th class="noe-th noe-th-index" role="columnheader" scope="col" aria-colindex="1">#</th>""");
         foreach (var column in visible)
         {
-            sb.Append("<th class=\"noe-th").Append(AlignClass(column.Align)).Append('"')
+            // data-noe-col names the column on every slot it owns (header, cell, footer) so one CSS
+            // rule can take the whole column out without the table losing its alignment.
+            sb.Append("<th class=\"noe-th").Append(AlignClass(column.Align))
+              .Append("\" data-noe-col=\"").Append(Html.Encode(column.Field)).Append('"')
               .Append(" role=\"columnheader\" scope=\"col\" aria-colindex=\"").Append(colIndex++).Append('"');
             if (column.WidthCss is not null) sb.Append(" style=\"width:").Append(Html.Encode(column.WidthCss)).Append('"');
             sb.Append('>').Append(Html.Encode(column.Header));
@@ -125,29 +128,33 @@ public sealed class EditorHtmlRenderer<TLine>
         var onPaste = $"@paste=\"onPaste($event, i, '{f}')\"";
         var onFocus = $"@focus=\"onFocus($event, i, '{f}')\"";
         var name = $":name=\"nameFor(i, '{f}')\"";
+        // The host may title any cell; returning nothing leaves the cell's own default, which is the
+        // value itself where a long text would otherwise be truncated with no recourse.
+        var title = $":title=\"cellTitle(row, '{f}')\"";
+        var titleOrValue = $":title=\"cellTitle(row, '{f}') ?? (row['{f}'] ?? '')\"";
 
         sb.Append("<td class=\"noe-td").Append(AlignClass(column.Align))
-          .Append("\" role=\"gridcell\" aria-colindex=\"").Append(columnIndex).Append("\">");
+          .Append("\" data-noe-col=\"").Append(Html.Encode(f)).Append("\" role=\"gridcell\" aria-colindex=\"").Append(columnIndex).Append("\">");
 
         switch (column.Kind)
         {
             case EditorKind.Text:
-                sb.Append($"<input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :title=\"row['{f}'] ?? ''\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @input=\"onInput(i, '{f}')\" {onKey} {onPaste}{placeholder}>");
+                sb.Append($"<input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {titleOrValue} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @input=\"onInput(i, '{f}')\" {onKey} {onPaste}{placeholder}>");
                 break;
 
             case EditorKind.Integer:
             case EditorKind.Decimal:
                 var mode = d == 0 ? "numeric" : "decimal";
-                sb.Append($"<input type=\"text\" inputmode=\"{mode}\" class=\"noe-input noe-num\" autocomplete=\"off\" data-noe-num data-noe-decimals=\"{d}\" data-noe-field=\"{f}\"{required} {name} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} x-effect=\"syncNumber($el, row, '{f}', {d})\" {onFocus} @input=\"onNumberInput($event, i, '{f}', {d})\" @blur=\"onNumberBlur($event, i, '{f}', {d})\" {onKey} {onPaste}{placeholder}>");
+                sb.Append($"<input type=\"text\" inputmode=\"{mode}\" class=\"noe-input noe-num\" autocomplete=\"off\" data-noe-num data-noe-decimals=\"{d}\" data-noe-field=\"{f}\"{required} {name} {title} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} x-effect=\"syncNumber($el, row, '{f}', {d})\" {onFocus} @input=\"onNumberInput($event, i, '{f}', {d})\" @blur=\"onNumberBlur($event, i, '{f}', {d})\" {onKey} {onPaste}{placeholder}>");
                 break;
 
             case EditorKind.Date:
-                sb.Append($"<input type=\"date\" class=\"noe-input\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @change=\"onChange(i, '{f}')\" {onKey} {onPaste}>");
+                sb.Append($"<input type=\"date\" class=\"noe-input\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {title} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @change=\"onChange(i, '{f}')\" {onKey} {onPaste}>");
                 break;
 
             case EditorKind.Select:
                 var emptyOption = column.Placeholder is null ? string.Empty : Html.Encode(column.Placeholder);
-                sb.Append($"<select class=\"noe-input\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}><option value=\"\">{emptyOption}</option>");
+                sb.Append($"<select class=\"noe-input\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {title} {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}><option value=\"\">{emptyOption}</option>");
                 foreach (var option in selectOptions)
                 {
                     sb.Append("<option value=\"").Append(Html.Encode(option.Value)).Append("\">").Append(Html.Encode(option.Label)).Append("</option>");
@@ -157,33 +164,33 @@ public sealed class EditorHtmlRenderer<TLine>
                 break;
 
             case EditorKind.Lookup:
-                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} :value=\"lookupText(row, '{f}')\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}'); lookupOpen($event, row, '{f}')\" @input=\"lookupSearch($event, row, '{f}')\" {onPaste} @keydown=\"lookupKey($event, row, i, '{f}')\" @blur=\"lookupBlur(row, '{f}')\"{placeholder}>");
+                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} :value=\"lookupText(row, '{f}')\" {title} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}'); lookupOpen($event, row, '{f}')\" @input=\"lookupSearch($event, row, '{f}')\" {onPaste} @keydown=\"lookupKey($event, row, i, '{f}')\" @blur=\"lookupBlur(row, '{f}')\"{placeholder}>");
                 sb.Append($"<input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\"></div>");
                 break;
 
             case EditorKind.Suggest:
                 // x-model, like a plain text column: what the user types is the posted value. The
                 // dropdown only offers to fill it in, and blur never rewrites it.
-                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :title=\"row['{f}'] ?? ''\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}')\" @input=\"suggestSearch($event, i, '{f}')\" {onPaste} @keydown=\"suggestKey($event, row, i, '{f}')\" @blur=\"suggestBlur()\"{placeholder}></div>");
+                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {titleOrValue} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}')\" @input=\"suggestSearch($event, i, '{f}')\" {onPaste} @keydown=\"suggestKey($event, row, i, '{f}')\" @blur=\"suggestBlur()\"{placeholder}></div>");
                 break;
 
             case EditorKind.Toggle:
-                sb.Append($"<input type=\"checkbox\" class=\"noe-check\" value=\"true\" data-noe-field=\"{f}\" {name} x-model=\"row['{f}']\" :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}>");
+                sb.Append($"<input type=\"checkbox\" class=\"noe-check\" value=\"true\" data-noe-field=\"{f}\" {name} x-model=\"row['{f}']\" {title} :style=\"locked(row) ? 'pointer-events:none' : ''\" {onFocus} @change=\"onChange(i, '{f}')\" {onKey}>");
                 sb.Append($"<input type=\"hidden\" {name} value=\"false\">");
                 break;
 
             case EditorKind.ReadOnly:
-                sb.Append($"<span class=\"noe-text\" x-text=\"row['{f}'] ?? ''\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
+                sb.Append($"<span class=\"noe-text\" {title} x-text=\"row['{f}'] ?? ''\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
                 break;
 
             case EditorKind.Computed when column.Editable:
                 // No name attribute: it takes typing but is never posted. syncNumber keeps the
                 // recomputed value on screen without overwriting the cell while it has focus.
-                sb.Append($"<input type=\"text\" inputmode=\"decimal\" class=\"noe-input noe-num\" autocomplete=\"off\" data-noe-num data-noe-decimals=\"{d}\" data-noe-field=\"{f}\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} x-effect=\"syncNumber($el, row, '{f}', {d})\" {onFocus} @input=\"onComputedInput($event, i, '{f}')\" @blur=\"onComputedBlur($event, i, '{f}', {d})\" {onKey}{placeholder}>");
+                sb.Append($"<input type=\"text\" inputmode=\"decimal\" class=\"noe-input noe-num\" autocomplete=\"off\" data-noe-num data-noe-decimals=\"{d}\" data-noe-field=\"{f}\" {title} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} x-effect=\"syncNumber($el, row, '{f}', {d})\" {onFocus} @input=\"onComputedInput($event, i, '{f}')\" @blur=\"onComputedBlur($event, i, '{f}', {d})\" {onKey}{placeholder}>");
                 break;
 
             case EditorKind.Computed:
-                sb.Append($"<span class=\"noe-text noe-num-text\" x-text=\"fmt(row['{f}'], {d})\"></span>");
+                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmt(row['{f}'], {d})\"></span>");
                 break;
 
             default:
@@ -209,11 +216,13 @@ public sealed class EditorHtmlRenderer<TLine>
         if (firstTotal < 0) return;
 
         sb.Append("""<tfoot class="noe-tfoot"><tr role="row" aria-live="polite">""");
-        sb.Append($"<td class=\"noe-td noe-tfoot-label\" colspan=\"{firstTotal + 1}\"><span x-text=\"t('totals')\"></span> <span class=\"noe-muted\" x-text=\"countLabel()\"></span></td>");
-        for (var k = firstTotal; k < visible.Count; k++)
+        // One cell per column, like any other row: the label would need a colspan to stretch, and a
+        // colspan cannot shrink when the page hides a column, so the label floats instead.
+        sb.Append("""<td class="noe-td noe-tfoot-label"><span class="noe-tfoot-text"><span x-text="t('totals')"></span> <span class="noe-muted" x-text="countLabel()"></span></span></td>""");
+        foreach (var column in visible)
         {
-            var column = visible[k];
-            sb.Append("<td class=\"noe-td").Append(AlignClass(column.Align)).Append("\">");
+            sb.Append("<td class=\"noe-td").Append(AlignClass(column.Align))
+              .Append("\" data-noe-col=\"").Append(Html.Encode(column.Field)).Append("\">");
             if (column.Total)
             {
                 sb.Append($"<span class=\"noe-total\" data-noe-total=\"{column.Field}\" x-text=\"fmt(totals['{column.Field}'], {column.Decimals})\"></span>");

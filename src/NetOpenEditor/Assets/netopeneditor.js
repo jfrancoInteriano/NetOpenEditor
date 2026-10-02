@@ -371,6 +371,17 @@
         if (row) e.target.value = fmt(row[field], decimals);
       },
 
+      /**
+       * Tooltip of a cell, from the host. Read inside the :title binding, so a text derived from
+       * the row follows the row; null or undefined leaves the cell's own default.
+       */
+      cellTitle(row, field) {
+        void this.adornVersion;
+        if (typeof this.hooks.cellTitle !== 'function') return null;
+        const title = this.hooks.cellTitle(row, field, this);
+        return title === null || title === undefined ? null : String(title);
+      },
+
       // ----- cell adornment -------------------------------------------------------------------
       /** Label of a cell's trailing button, from the host. No label means no button. */
       adornmentLabel(row, field) {

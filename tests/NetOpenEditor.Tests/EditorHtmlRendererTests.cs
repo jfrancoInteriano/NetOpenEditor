@@ -60,8 +60,8 @@ public sealed class EditorHtmlRendererTests
 
         Assert.Equal(9 + 2, Regex.Matches(html, "<th ").Count);
         Assert.Contains("""<th class="noe-th noe-th-index" role="columnheader" scope="col" aria-colindex="1">#</th>""", html);
-        Assert.Contains("""<th class="noe-th" role="columnheader" scope="col" aria-colindex="2" style="width:20rem">Cuenta<span class="noe-required">*</span></th>""", html);
-        Assert.Matches("""<th class="noe-th noe-align-end" role="columnheader" scope="col" aria-colindex="\d+">Débito</th>""", html);
+        Assert.Contains("""<th class="noe-th" data-noe-col="AccountId" role="columnheader" scope="col" aria-colindex="2" style="width:20rem">Cuenta<span class="noe-required">*</span></th>""", html);
+        Assert.Matches("""<th class="noe-th noe-align-end" data-noe-col="DebitAmount" role="columnheader" scope="col" aria-colindex="\d+">Débito</th>""", html);
         Assert.Contains("&lt;b&gt;Desc&lt;/b&gt;", html);
         Assert.DoesNotContain("<b>Desc</b>", html);
     }
@@ -84,7 +84,7 @@ public sealed class EditorHtmlRendererTests
         var html = Render(JournalOptions());
 
         // text
-        Assert.Contains("""<input type="text" class="noe-input" autocomplete="off" data-noe-field="Description" :name="nameFor(i, 'Description')" x-model="row['Description']" :title="row['Description'] ?? ''" :readonly="locked(row)" :class="{ 'noe-invalid': cellError(row, 'Description') }""", html);
+        Assert.Contains("""<input type="text" class="noe-input" autocomplete="off" data-noe-field="Description" :name="nameFor(i, 'Description')" x-model="row['Description']" :title="cellTitle(row, 'Description') ?? (row['Description'] ?? '')" :readonly="locked(row)" :class="{ 'noe-invalid': cellError(row, 'Description') }""", html);
         Assert.Contains("""@input="onInput(i, 'Description')" @keydown="onKey($event, i, 'Description')" @paste="onPaste($event, i, 'Description')" placeholder="Detalle">""", html);
         // decimal
         Assert.Contains("""inputmode="decimal" class="noe-input noe-num" autocomplete="off" data-noe-num data-noe-decimals="2" data-noe-field="DebitAmount""", html);
@@ -104,7 +104,7 @@ public sealed class EditorHtmlRendererTests
         Assert.Contains("""<input type="checkbox" class="noe-check" value="true" data-noe-field="Active" :name="nameFor(i, 'Active')" x-model="row['Active']" """.TrimEnd(), html);
         Assert.Contains("""<input type="hidden" :name="nameFor(i, 'Active')" value="false">""", html);
         // computed
-        Assert.Contains("""<span class="noe-text noe-num-text" x-text="fmt(row['LineTotal'], 2)"></span>""", html);
+        Assert.Contains("""<span class="noe-text noe-num-text" :title="cellTitle(row, 'LineTotal')" x-text="fmt(row['LineTotal'], 2)"></span>""", html);
         Assert.DoesNotContain("nameFor(i, 'LineTotal')", html);
         // per-cell error
         Assert.Contains("""<div class="noe-error" :id="'journal-r' + i + '-Description-err'" x-show="cellError(row, 'Description')" x-text="cellError(row, 'Description')"></div>""", html);
@@ -117,7 +117,7 @@ public sealed class EditorHtmlRendererTests
         var options = new EditorOptionsBuilder<TestLine>("ro").Column(l => l.Unit, c => c.ReadOnly()).Build();
         var html = Render(options);
 
-        Assert.Contains("""<span class="noe-text" x-text="row['Unit'] ?? ''"></span><input type="hidden" :name="nameFor(i, 'Unit')" :value="row['Unit'] ?? ''">""", html);
+        Assert.Contains("""<span class="noe-text" :title="cellTitle(row, 'Unit')" x-text="row['Unit'] ?? ''"></span><input type="hidden" :name="nameFor(i, 'Unit')" :value="row['Unit'] ?? ''">""", html);
     }
 
     [Fact]
@@ -131,16 +131,44 @@ public sealed class EditorHtmlRendererTests
     }
 
     [Fact]
-    public void Footer_RendersOnlyWithTotalsAndSpansUpToFirstTotal()
+    public void Footer_RendersOnlyWithTotals_WithOneCellPerColumn()
     {
         var html = Render(JournalOptions());
 
-        Assert.Contains("""<tfoot class="noe-tfoot"><tr role="row" aria-live="polite"><td class="noe-td noe-tfoot-label" colspan="3"><span x-text="t('totals')"></span> <span class="noe-muted" x-text="countLabel()"></span></td>""", html);
+        Assert.Contains("""<tfoot class="noe-tfoot"><tr role="row" aria-live="polite"><td class="noe-td noe-tfoot-label"><span class="noe-tfoot-text"><span x-text="t('totals')"></span> <span class="noe-muted" x-text="countLabel()"></span></span></td>""", html);
         Assert.Contains("""<span class="noe-total" data-noe-total="DebitAmount" x-text="fmt(totals['DebitAmount'], 2)"></span>""", html);
         Assert.Contains("""<span class="noe-total" data-noe-total="CreditAmount" x-text="fmt(totals['CreditAmount'], 2)"></span>""", html);
 
         var noTotals = Render(new EditorOptionsBuilder<TestLine>("x").Column(l => l.Description).Build());
         Assert.DoesNotContain("<tfoot", noTotals);
+    }
+
+    [Fact]
+    public void EveryCellOfAColumn_NamesIt_SoOneRuleCanHideTheWholeColumn()
+    {
+        var html = Render(JournalOptions());
+
+        // data-noe-col names the slot (th, td, footer cell); data-noe-field keeps meaning "the
+        // control", so a host selector that reaches for an input still finds one element.
+        Assert.Contains("""<th class="noe-th" data-noe-col="Description" role="columnheader" scope="col" aria-colindex="3">""", html);
+        Assert.Contains("""<td class="noe-td" data-noe-col="Description" role="gridcell" aria-colindex="3">""", html);
+        // One footer cell per column instead of a spanning label: a hidden column keeps the totals aligned.
+        Assert.Contains("""<td class="noe-td" data-noe-col="Description"></td>""", html);
+        Assert.Contains("""<td class="noe-td noe-align-end" data-noe-col="DebitAmount"><span class="noe-total" data-noe-total="DebitAmount" """.TrimEnd(), html);
+        Assert.DoesNotContain("noe-tfoot-label\" colspan", html);
+    }
+
+    [Fact]
+    public void EveryCell_AsksTheHostForItsTitle()
+    {
+        var html = Render(JournalOptions());
+
+        // Text keeps its own value as the fallback tooltip; the hook wins when it answers.
+        Assert.Contains(""":title="cellTitle(row, 'Description') ?? (row['Description'] ?? '')" """.TrimEnd(), html);
+        // Cells that never had a tooltip show one only while the hook returns something.
+        Assert.Contains(""":title="cellTitle(row, 'DebitAmount')" """.TrimEnd(), html);
+        Assert.Contains(""":title="cellTitle(row, 'LineTotal')" """.TrimEnd(), html);
+        Assert.Contains(""":title="cellTitle(row, 'AccountId')" """.TrimEnd(), html);
     }
 
     [Fact]

@@ -20,6 +20,13 @@
 <script>
     document.addEventListener('alpine:init', () => {
         NetOpenEditor.configure('journal-lines', {
+            // Derived from the row, not from the cell: the tooltip is read inside the binding, so it
+            // follows every keystroke in either amount instead of showing a number from before.
+            cellTitle(row, field, editor) {
+                if (field !== 'DebitAmount' && field !== 'CreditAmount') return;
+                const net = editor.num(row.DebitAmount) - editor.num(row.CreditAmount);
+                return 'Neto de la línea: ' + net.toFixed(2);
+            },
             onCellChange(row, field, editor) {
                 if (field === 'DebitAmount' && editor.num(row.DebitAmount) > 0) row.CreditAmount = 0;
                 if (field === 'CreditAmount' && editor.num(row.CreditAmount) > 0) row.DebitAmount = 0;

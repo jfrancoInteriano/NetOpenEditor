@@ -72,7 +72,13 @@
 .noe-btn-remove:hover { color: var(--noe-error); }
 
 .noe-tfoot .noe-td { background: var(--noe-head-bg); font-weight: 600; border-top: 2px solid var(--noe-focus); }
-.noe-tfoot-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--noe-head-text); }
+/* The label paints across the cells to its right instead of spanning them: a colspan could not
+   shrink when the page hides a column, and the footer would stop lining up with the rows. */
+.noe-tfoot-label { position: relative; }
+.noe-tfoot-text {
+  position: absolute; left: .5rem; white-space: nowrap;
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--noe-head-text);
+}
 .noe-muted { color: var(--noe-muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 .noe-lookup { position: relative; }

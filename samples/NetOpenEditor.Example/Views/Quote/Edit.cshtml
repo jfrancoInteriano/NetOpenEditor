@@ -65,6 +65,11 @@
                     row.__host.priceDerived = true;
                 }
             },
+            // A computed cell can carry a derived tooltip too: what the line is worth before tax.
+            cellTitle(row, field, editor) {
+                if (field !== 'LineTotal') return;
+                return 'Sin impuesto: ' + (editor.num(row.Quantity) * editor.num(row.UnitPrice)).toFixed(2);
+            },
             // The button's label is the row's current unit, and the host owns that state.
             adornmentLabel(row, field, editor) {
                 return row.__host.discountUnit === 'money' ? (document.getElementById('currency')?.value || 'HNL') : '%';
