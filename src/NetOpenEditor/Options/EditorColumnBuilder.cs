@@ -142,7 +142,8 @@ public sealed class EditorColumnBuilder<TLine, TProp> : IEditorColumnBuilder<TLi
             throw new EditorConfigurationException($"Editor '{editorId}': Select column '{_field}' needs at least one option, or an options factory.");
         if (_editable && kind is not EditorKind.Computed)
             throw new EditorConfigurationException($"Editor '{editorId}': column '{_field}' is Editable but is not a computed column.");
-        if (_adornment && kind is EditorKind.Hidden or EditorKind.ReadOnly or EditorKind.Computed)
+        // An editable computed column does render a control, so it can carry an adornment.
+        if (_adornment && (kind is EditorKind.Hidden or EditorKind.ReadOnly || (kind is EditorKind.Computed && !_editable)))
             throw new EditorConfigurationException($"Editor '{editorId}': column '{_field}' has an Adornment but renders no control.");
         if (_suggest is not null && _lookup is not null)
             throw new EditorConfigurationException($"Editor '{editorId}': column '{_field}' declares both Suggest and Lookup; pick one.");

@@ -619,7 +619,10 @@
           }
           case 'decimal': {
             const n = this.pasteNumber(text);
-            return n === null ? undefined : n;
+            if (n === null) return undefined;
+            // Reuse the keyboard rule rather than rounding here: pasting a value and typing it must
+            // land on the same number, and the cell must be able to show what the model holds.
+            return toNumber(sanitizeNumber(String(n), c.decimals === undefined ? 2 : c.decimals));
           }
           case 'toggle': {
             const t = text.toLowerCase();
@@ -841,6 +844,7 @@
         tr.inputEl = e.target;
         this.lookup.rowKey = row.__key;
         this.lookup.field = field;
+        this.lookup.mode = 'lookup';
         clearTimeout(tr.timer);
         if (term.length < (cfg.minLength || 0)) { this.lookupClose(); return; }
         tr.timer = setTimeout(() => this.lookupFetch(cfg, term), cfg.debounce === undefined ? 220 : cfg.debounce);

@@ -84,7 +84,7 @@ public sealed class EditorHtmlRendererTests
         var html = Render(JournalOptions());
 
         // text
-        Assert.Contains("""<input type="text" class="noe-input" autocomplete="off" data-noe-field="Description" :name="nameFor(i, 'Description')" x-model="row['Description']" :readonly="locked(row)" :class="{ 'noe-invalid': cellError(row, 'Description') }""", html);
+        Assert.Contains("""<input type="text" class="noe-input" autocomplete="off" data-noe-field="Description" :name="nameFor(i, 'Description')" x-model="row['Description']" :title="row['Description'] ?? ''" :readonly="locked(row)" :class="{ 'noe-invalid': cellError(row, 'Description') }""", html);
         Assert.Contains("""@input="onInput(i, 'Description')" @keydown="onKey($event, i, 'Description')" @paste="onPaste($event, i, 'Description')" placeholder="Detalle">""", html);
         // decimal
         Assert.Contains("""inputmode="decimal" class="noe-input noe-num" autocomplete="off" data-noe-num data-noe-decimals="2" data-noe-field="DebitAmount""", html);

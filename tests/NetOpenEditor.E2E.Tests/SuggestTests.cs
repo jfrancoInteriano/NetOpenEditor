@@ -140,4 +140,40 @@ public sealed class SuggestTests(SampleServerFixture server)
 
         Assert.Equal("1101 - Caja", await page.Locator(Cell(0, "AccountId")).InputValueAsync());
     }
+
+    [Fact]
+    public async Task ASuggestAndALookup_InTheSameEditor_EachPickWithTheirOwnRules()
+    {
+        var page = await OpenAsync();
+
+        // Use the suggest first: it leaves the shared panel in "suggest" mode.
+        await TypeAsync(page, 0, "Lap");
+        await page.WaitForSelectorAsync(".noe-lookup-item");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForTimeoutAsync(300);
+        Assert.Equal("Laptop", await page.Locator(Cell(0, "Description")).InputValueAsync());
+
+        // Now the lookup in the same row must behave as a lookup: picking fills key and companion.
+        await page.Locator(Cell(0, "AccountId")).ClickAsync();
+        await page.Locator(Cell(0, "AccountId")).PressSequentiallyAsync("caj");
+        await page.WaitForSelectorAsync(".noe-lookup-item");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForTimeoutAsync(300);
+
+        Assert.Equal("1101 - Caja", await page.Locator(Cell(0, "AccountId")).InputValueAsync());
+        Assert.Equal("1101", await FieldAsync(page, 0, "AccountCode"));
+        // And the suggest cell kept its text: the lookup pick did not run through the suggest path.
+        Assert.Equal("Laptop", await FieldAsync(page, 0, "Description"));
+    }
+
+    [Fact]
+    public async Task ALongValue_IsReadableOnHover()
+    {
+        var page = await OpenAsync();
+
+        await TypeAsync(page, 0, "Tubería de PVC de 4 pulgadas, cédula 40, por unidad");
+
+        Assert.Equal("Tubería de PVC de 4 pulgadas, cédula 40, por unidad",
+            await page.Locator(Cell(0, "Description")).GetAttributeAsync("title"));
+    }
 }

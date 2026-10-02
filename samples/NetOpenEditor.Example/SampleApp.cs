@@ -52,7 +52,10 @@ public static class SampleApp
                 .Column(l => l.TaxRate, c => c.Header("ISV %").Decimal(2).Width("7rem"))
                 // The trailing button flips this row between percent and money; the unit itself is
                 // host state in row.__host and is never posted.
-                .Column(l => l.DiscountPercent, c => c.Header("Desc.").Decimal(2).Width("9rem").Adornment())
+                // Shows money or percent depending on the row's mode, posts DiscountPercent either
+                // way: an editable computed column that also carries the unit toggle.
+                .Computed("DiscountShown", "Desc.", c => c.Decimal(2).Width("9rem").Editable().Adornment())
+                .Column(l => l.DiscountPercent, c => c.Hidden())
                 .Computed("LineTotal", "Total", c => c.Decimal(2).Total().Width("9rem").Editable())
                 .MinRows(1))
             .FromSource<QuoteLineSource>()
@@ -78,6 +81,11 @@ public static class SampleApp
                         .Param("providerId", "[name='ProviderId']")))
                 .Column(l => l.Quantity, c => c.Header("Cantidad").Decimal(2).Min(0m).Total().Width("8rem"))
                 .Column(l => l.UnitOfMeasure, c => c.Header("Unidad").Width("8rem"))
+                // A Lookup next to a Suggest in the same editor: both drive the same panel.
+                .Column(l => l.AccountId, c => c.Header("Cuenta").Width("16rem")
+                    .Lookup("/accounts/lookup", lk => lk
+                        .ValueField("accountId").LabelField("display").Display("code", "name")
+                        .Companion(l => l.AccountCode, "code")))
                 .Column(l => l.ProductId, c => c.Hidden())
                 .Column(l => l.ServiceId, c => c.Hidden()));
 

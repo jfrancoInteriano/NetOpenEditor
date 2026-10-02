@@ -95,4 +95,57 @@ public sealed class AdornmentTests(SampleServerFixture server)
 
         Assert.Equal("HNL", await Button(quote, 1).First.InnerTextAsync());
     }
+
+    [Fact]
+    public async Task AnEditableComputedCell_RendersBothTheInputAndTheButton()
+    {
+        var page = await OpenAsync();
+
+        var cell = page.Locator(Cell(0, "DiscountShown"));
+        Assert.Equal("input", await cell.EvaluateAsync<string>("el => el.tagName.toLowerCase()"));
+        Assert.Null(await cell.GetAttributeAsync("name"));          // computed: never posted
+        Assert.Equal("%", await Button(page, 0).First.InnerTextAsync());
+    }
+
+    [Fact]
+    public async Task TheCellShowsMoneyOrPercent_ButAlwaysPostsThePercentage()
+    {
+        var page = await OpenAsync();
+        await page.Locator(Cell(0, "Quantity")).FillAsync("2");
+        await page.Keyboard.PressAsync("Tab");
+        await page.Locator(Cell(0, "UnitPrice")).FillAsync("100");
+        await page.Keyboard.PressAsync("Tab");
+
+        // 10% of a 200 line
+        await page.Locator(Cell(0, "DiscountShown")).FillAsync("10");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+        Assert.Equal("10", await page.EvaluateAsync<string>("() => String(NetOpenEditor.get('quote-lines').rows()[0].DiscountPercent)"));
+
+        // Flipping to money shows the amount, and typing an amount still posts a percentage.
+        await Button(page, 0).First.ClickAsync();
+        await page.WaitForTimeoutAsync(300);
+        Assert.Equal("20.00", await page.Locator(Cell(0, "DiscountShown")).InputValueAsync());
+
+        await page.Locator(Cell(0, "DiscountShown")).FillAsync("50");
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+
+        Assert.Equal("25", await page.EvaluateAsync<string>("() => String(NetOpenEditor.get('quote-lines').rows()[0].DiscountPercent)"));
+        // The box keeps meaning money: it does not repaint itself as 25.
+        Assert.Equal("50.00", await page.Locator(Cell(0, "DiscountShown")).InputValueAsync());
+    }
+
+    [Fact]
+    public async Task RefreshStillRepaintsTheLabel_OnAnEditableComputedCell()
+    {
+        var page = await OpenAsync();
+        await Button(page, 0).First.ClickAsync();
+        await page.WaitForTimeoutAsync(200);
+
+        await page.SelectOptionAsync("#currency", "USD");
+        await page.WaitForTimeoutAsync(300);
+
+        Assert.Equal("USD", await Button(page, 0).First.InnerTextAsync());
+    }
 }

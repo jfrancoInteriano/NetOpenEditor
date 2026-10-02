@@ -192,4 +192,22 @@ public sealed class AllowAddTests(SampleServerFixture server)
         Assert.Contains("ISV 18%", await full.Locator("[data-noe-row='0'] [data-noe-field='TaxCode']").InnerTextAsync(), StringComparison.Ordinal);
         Assert.DoesNotContain("ISV 18%", await reduced.Locator("[data-noe-row='0'] [data-noe-field='TaxCode']").InnerTextAsync(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task APastedNumber_IsTruncatedToTheColumnDecimals()
+    {
+        var page = await OpenAsync();
+
+        // Received is Decimal(2): pasting 0.005 must not leave the model holding a value the cell
+        // cannot show, or the range message would talk about a different number than the one typed.
+        await page.EvaluateAsync(PasteScript(
+            "[data-noe-row='0'] [data-noe-field='Received']", "'0.005	L-1'"));
+        await page.WaitForTimeoutAsync(400);
+
+        var stored = await page.EvaluateAsync<string>(
+            "() => String(NetOpenEditor.get('receipt-lines').rows()[0].Received)");
+
+        Assert.Equal("0", stored);
+        Assert.Equal("0.00", await page.Locator(Cell(0, "Received")).InputValueAsync());
+    }
 }

@@ -223,6 +223,49 @@ document.getElementById('currency')
 `refresh()` vuelve a pedir los rótulos y recalcula los totales. Sin eso, las filas ya marcadas
 seguirían mostrando el rótulo anterior.
 
+### La celda que muestra un valor y postea otro
+
+Las dos mitades se combinan: `Computed(...).Editable().Adornment()` es un input calculado con un botón
+al final. Sirve para una celda que se edita en dos unidades —un descuento en dinero o en porcentaje—
+pero postea siempre la misma:
+
+```csharp
+// Lo que se ve: dinero o porcentaje, según la fila.
+.Computed("DiscountShown", "Desc.", c => c.Decimal(2).Editable().Adornment())
+// Lo que se postea: siempre el porcentaje.
+.Column(l => l.DiscountPercent, c => c.Hidden())
+```
+
+```js
+NetOpenEditor.configure('quote-lines', {
+    // El botón dice en qué unidad se está editando esta fila.
+    adornmentLabel: (row) => row.__host.discountUnit === 'money' ? currencyCode() : '%',
+    onAdornment(row, field, editor) {
+        row.__host.discountUnit = row.__host.discountUnit === 'money' ? 'percent' : 'money';
+    },
+    onComputedInput(row, field, value, editor) {
+        if (field !== 'DiscountShown') return;
+        const typed = editor.num(value), gross = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+        row.DiscountPercent = row.__host.discountUnit === 'money'
+            ? (gross > 0 ? Math.min(100, typed / gross * 100) : 0)
+            : typed;
+    },
+    compute(row, editor) {
+        // La columna posteada está oculta: nada en pantalla la puede llenar, así que una línea sin
+        // descuento tiene que postear un número y no el vacío con el que nace la fila.
+        row.DiscountPercent = editor.num(row.DiscountPercent);
+        const gross = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+        row.DiscountShown = row.__host.discountUnit === 'money'
+            ? gross * editor.num(row.DiscountPercent) / 100
+            : editor.num(row.DiscountPercent);
+    }
+});
+```
+
+La caja **no cambia de significado**: en modo dinero se teclea dinero y se sigue viendo dinero, aunque
+lo posteado sea el porcentaje equivalente. Una columna `Hidden` o `ReadOnly` sigue rechazando
+`Adornment()` —no renderiza control donde ponerlo—, y una `Computed` sin `Editable()` también.
+
 ## Texto con autocompletado: `Suggest`
 
 Cuando **el texto es el dato** y el buscador solo ayuda a escribirlo —pedir un artículo que quizá no
@@ -399,7 +442,8 @@ final. Pegar **una sola** celda mantiene el comportamiento normal del navegador.
 - La resolución es posterior al pegado: verás un segundo `noe:change` cuando llegan esos valores.
 - Pegar cierra el buscador de la celda que tuviera el foco, y `Esc` lo cierra desde cualquier celda.
 - Los números aceptan separador de miles y coma decimal: `1.234,56` y `1,234.56` entran como
-  `1234.56`. Las filas bloqueadas (`isLocked`) se saltan sin consumir una línea del bloque.
+  `1234.56`, y se truncan a los decimales de la columna igual que al teclear: `0.005` en una columna
+  `Decimal(2)` entra como `0.00`, no redondeado a `0.01`. Las filas bloqueadas (`isLocked`) se saltan sin consumir una línea del bloque.
 - Máximo 500 filas por pegada; al pasarse se pegan las primeras 500 y se muestra el mensaje
   `paste.truncated`.
 - Se emite **un solo** `noe:change` por pegada, no uno por celda.

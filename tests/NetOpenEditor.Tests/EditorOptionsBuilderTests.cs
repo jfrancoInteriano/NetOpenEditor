@@ -426,4 +426,44 @@ public sealed class EditorOptionsBuilderTests
 
         Assert.Contains("DebitAmount", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AnEditableComputedColumn_CanCarryAnAdornment()
+    {
+        var options = Builder()
+            .Column(l => l.Quantity)
+            .Computed("Discount", "Desc.", c => c.Decimal(2).Editable().Adornment())
+            .Build();
+
+        var computed = options.Columns.Single(c => c.Field == "Discount");
+
+        Assert.True(computed.Editable);
+        Assert.True(computed.Adornment);
+        Assert.False(computed.Posts);
+    }
+
+    [Fact]
+    public void AComputedColumnWithoutEditable_StillRejectsAnAdornment()
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder()
+                .Column(l => l.Quantity)
+                .Computed("Discount", "Desc.", c => c.Decimal(2).Adornment())
+                .Build());
+
+        Assert.Contains("renders no control", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("hidden")]
+    [InlineData("readonly")]
+    public void HiddenAndReadOnlyColumns_StillRejectAnAdornment(string kind)
+    {
+        var ex = Assert.Throws<EditorConfigurationException>(() =>
+            Builder()
+                .Column(l => l.Description, c => { if (kind == "hidden") c.Hidden(); else c.ReadOnly(); c.Adornment(); })
+                .Build());
+
+        Assert.Contains("renders no control", ex.Message, StringComparison.Ordinal);
+    }
 }

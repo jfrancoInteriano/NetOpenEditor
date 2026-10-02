@@ -16,6 +16,8 @@ public sealed class RequestLine
     public Guid? ServiceId { get; set; }
     public string? UnitOfMeasure { get; set; }
     public decimal Quantity { get; set; }
+    public Guid? AccountId { get; set; }
+    public string? AccountCode { get; set; }
 }
 
 public sealed class RequestForm

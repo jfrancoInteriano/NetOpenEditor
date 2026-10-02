@@ -47,6 +47,15 @@
             // Typing the printed total back-solves the unit price; the editor never writes the
             // computed cell itself, so compute() stays the single owner of its value.
             onComputedInput(row, field, value, editor) {
+                if (field === 'DiscountShown') {
+                    const typed = editor.num(value);
+                    const gross = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+                    // What the box means depends on the row's mode; what we post never does.
+                    row.DiscountPercent = row.__host.discountUnit === 'money'
+                        ? (gross > 0 ? Math.min(100, Math.round(typed / gross * 1000000) / 10000) : 0)
+                        : typed;
+                    return;
+                }
                 if (field !== 'LineTotal') return;
                 const total = editor.num(value);
                 const qty = editor.num(row.Quantity);
@@ -69,6 +78,13 @@
                 else row.__host.discountMoney = null;
             },
             compute(row, editor) {
+                // The posted percentage is hidden, so nothing on screen can fill it in: a line the
+                // user never discounted must still post a number, not the blank the row starts with.
+                row.DiscountPercent = editor.num(row.DiscountPercent);
+                const gross = editor.num(row.Quantity) * editor.num(row.UnitPrice);
+                row.DiscountShown = row.__host.discountUnit === 'money'
+                    ? gross * editor.num(row.DiscountPercent) / 100
+                    : editor.num(row.DiscountPercent);
                 row.LineTotal = editor.num(row.Quantity) * editor.num(row.UnitPrice) * (1 + editor.num(row.TaxRate) / 100);
             }
         });

@@ -132,7 +132,7 @@ public sealed class EditorHtmlRenderer<TLine>
         switch (column.Kind)
         {
             case EditorKind.Text:
-                sb.Append($"<input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @input=\"onInput(i, '{f}')\" {onKey} {onPaste}{placeholder}>");
+                sb.Append($"<input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :title=\"row['{f}'] ?? ''\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @input=\"onInput(i, '{f}')\" {onKey} {onPaste}{placeholder}>");
                 break;
 
             case EditorKind.Integer:
@@ -164,7 +164,7 @@ public sealed class EditorHtmlRenderer<TLine>
             case EditorKind.Suggest:
                 // x-model, like a plain text column: what the user types is the posted value. The
                 // dropdown only offers to fill it in, and blur never rewrites it.
-                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}')\" @input=\"suggestSearch($event, i, '{f}')\" {onPaste} @keydown=\"suggestKey($event, row, i, '{f}')\" @blur=\"suggestBlur()\"{placeholder}></div>");
+                sb.Append($"<div class=\"noe-lookup\"><input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" :title=\"row['{f}'] ?? ''\" :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} @focus=\"onFocus($event, i, '{f}')\" @input=\"suggestSearch($event, i, '{f}')\" {onPaste} @keydown=\"suggestKey($event, row, i, '{f}')\" @blur=\"suggestBlur()\"{placeholder}></div>");
                 break;
 
             case EditorKind.Toggle:
