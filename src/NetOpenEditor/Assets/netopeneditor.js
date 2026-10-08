@@ -119,6 +119,7 @@
       hooks: {},
       totals: {},
       formError: '',
+      formErrorIsMinRows: false,   // the min-rows error clears itself once the line it asks for exists
       adornVersion: 0,   // bumped by refresh(): lets labels follow state outside the editor
       focusSnapshot: null,
       lookup: { open: false, rowKey: null, field: null, items: [], active: -1, loading: false, style: '', mode: 'lookup' },
@@ -213,6 +214,10 @@
         if (!row.__phantom || !this.allowAdd) return;
         row.__phantom = false;
         this.rows.push(this.hydrate({}, true));
+        if (this.formErrorIsMinRows && this.count() >= (this.config.minRows || 0)) {
+          this.formError = '';
+          this.formErrorIsMinRows = false;
+        }
         if (typeof this.hooks.onRowAdded === 'function') this.hooks.onRowAdded(row, this);
       },
       onFocus(e, i, field) {
@@ -712,6 +717,7 @@
         }
         this.recalc();
         this.formError = parsed.truncated > 0 ? this.t('paste.truncated', { n: parsed.truncated }) : '';
+        this.formErrorIsMinRows = false;
         this.emit('noe:change', { pasted: touched.length });
         this.resolvePastedLookups(pendingLookups);
         this.$nextTick(() => {
@@ -801,6 +807,7 @@
         let ok = true;
         let first = null;
         this.formError = '';
+        this.formErrorIsMinRows = false;
         this.rows.forEach((row, i) => {
           if (row.__phantom) return;
           for (const c of this.columns) {
@@ -819,6 +826,7 @@
         const min = this.config.minRows || 0;
         if (this.count() < min) {
           this.formError = this.t('minRows', { n: min });
+          this.formErrorIsMinRows = true;
           ok = false;
         }
         if (first) this.$nextTick(() => this.focusCell(first.i, first.field));

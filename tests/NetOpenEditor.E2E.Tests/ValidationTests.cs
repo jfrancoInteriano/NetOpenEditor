@@ -79,6 +79,23 @@ public sealed class ValidationTests(SampleServerFixture server)
         Assert.Equal("Se requiere al menos 1 línea(s)", await page.Locator(".noe-form-error").InnerTextAsync());
     }
 
+    // Adding the line the error asks for clears it. It used to stay on screen until the next
+    // submit, so the user kept reading "at least 1 line" with the line right there.
+    [Fact]
+    public async Task MinRows_ErrorClearsOnceALineIsAdded()
+    {
+        var page = await OpenAsync();
+        await page.Locator("[data-noe-row='0'] .noe-btn-remove").ClickAsync();
+        await page.Locator("[data-noe-row='0'] .noe-btn-remove").ClickAsync();
+        await page.Locator("#save").ClickAsync();
+        await page.WaitForTimeoutAsync(300);
+        Assert.True(await page.Locator(".noe-form-error").IsVisibleAsync());
+
+        await page.Locator(Cell(0, "Description")).FillAsync("Nueva linea");
+
+        Assert.True(await page.Locator(".noe-form-error").IsHiddenAsync());
+    }
+
     [Fact]
     public async Task ValidateApi_ReturnsFalseAndMarksErrorsWithoutSubmitting()
     {
