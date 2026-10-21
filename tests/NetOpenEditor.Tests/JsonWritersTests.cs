@@ -119,7 +119,7 @@ public sealed class JsonWritersTests
     }
 
     [Fact]
-    public void Config_HiddenColumnsOverrideKind()
+    public void Config_HiddenColumns_PostAMappedColumn_AndDropAComputedOne()
     {
         var options = JournalOptions();
         var ctx = new EditorRenderContext { HiddenColumns = new HashSet<string> { "Description", "LineTotal" } };
@@ -128,8 +128,10 @@ public sealed class JsonWritersTests
         using var doc = JsonDocument.Parse(json);
         var columns = doc.RootElement.GetProperty("columns").EnumerateArray().ToList();
 
+        // A mapped column keeps posting from a hidden input...
         Assert.Equal("hidden", columns.Single(c => c.GetProperty("field").GetString() == "Description").GetProperty("kind").GetString());
-        Assert.Equal("computed", columns.Single(c => c.GetProperty("field").GetString() == "LineTotal").GetProperty("kind").GetString());
+        // ...and a computed one, which posts nothing, leaves the view altogether.
+        Assert.DoesNotContain(columns, c => c.GetProperty("field").GetString() == "LineTotal");
     }
 
     [Fact]

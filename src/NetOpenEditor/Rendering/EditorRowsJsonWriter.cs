@@ -72,10 +72,27 @@ public static class EditorRowsJsonWriter
                 });
                 break;
             default:
-                // Text, Select, Lookup, ReadOnly, Hidden: strings (Guid, enum, int → invariant string)
-                writer.WriteStringValue(value as string ?? Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+                // Text, Select, Lookup, Hidden and the plain read-only cell. A hidden column keeps
+                // the declared type of its property: "15.00" and "False" are strings on the client,
+                // and a string is truthy, so the host had to convert every seeded value by hand.
+                WriteByDeclaredType(writer, column.ValueType, value);
                 break;
         }
+    }
+
+    private static void WriteByDeclaredType(Utf8JsonWriter writer, Type? declared, object value)
+    {
+        var type = declared is null ? value.GetType() : Nullable.GetUnderlyingType(declared) ?? declared;
+        if (type == typeof(bool)) { writer.WriteBooleanValue(value is true); return; }
+        if (type == typeof(decimal) || type == typeof(int) || type == typeof(long) || type == typeof(short)
+            || type == typeof(double) || type == typeof(float))
+        {
+            WriteNumber(writer, value);
+            return;
+        }
+
+        // Guid, enum, string and anything else: the invariant text, as before.
+        writer.WriteStringValue(value as string ?? Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
     private static void WriteNumber(Utf8JsonWriter writer, object value)

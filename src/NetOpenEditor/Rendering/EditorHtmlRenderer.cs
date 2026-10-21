@@ -47,6 +47,7 @@ public sealed class EditorHtmlRenderer<TLine>
         var hidden = new List<EditorColumn<TLine>>();
         foreach (var column in _options.Columns)
         {
+            if (EditorConfigJsonWriter.IsDropped(column, context)) continue;
             if (EditorConfigJsonWriter.EffectiveKind(column, context) == EditorKind.Hidden) hidden.Add(column);
             else visible.Add(column);
         }
@@ -136,10 +137,20 @@ public sealed class EditorHtmlRenderer<TLine>
         sb.Append("<td class=\"noe-td").Append(AlignClass(column.Align))
           .Append("\" data-noe-col=\"").Append(Html.Encode(f)).Append("\" role=\"gridcell\" aria-colindex=\"").Append(columnIndex).Append("\">");
 
+        // The button is a suffix of the control, not a second line: both sit in a flex line, so a
+        // narrow column shrinks the input and the button never wraps under it.
+        if (column.Adornment) sb.Append("<div class=\"noe-adorned\">");
+
         switch (column.Kind)
         {
             case EditorKind.Text:
                 sb.Append($"<input type=\"text\" class=\"noe-input\" autocomplete=\"off\" data-noe-field=\"{f}\"{required} {name} x-model=\"row['{f}']\" {titleOrValue} :readonly=\"locked(row)\" {invalidClass} {ariaInvalid} {describedBy}{ariaRequired} {onFocus} @input=\"onInput(i, '{f}')\" {onKey} {onPaste}{placeholder}>");
+                break;
+
+            case EditorKind.Integer when column.ReadOnly:
+            case EditorKind.Decimal when column.ReadOnly:
+                // Numeric and read-only: the formatted value, and the hidden input that posts it.
+                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmt(row['{f}'], {d})\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
                 break;
 
             case EditorKind.Integer:
@@ -199,10 +210,10 @@ public sealed class EditorHtmlRenderer<TLine>
 
         if (column.Adornment)
         {
-            sb.Append($"<button type=\"button\" class=\"noe-adorn\" tabindex=\"-1\" x-show=\"adornmentLabel(row, '{f}')\" @mousedown.prevent @click=\"onAdornment(row, '{f}')\" :title=\"adornmentLabel(row, '{f}')\" :aria-label=\"adornmentLabel(row, '{f}')\" x-text=\"adornmentLabel(row, '{f}')\"></button>");
+            sb.Append($"<button type=\"button\" class=\"noe-adorn\" x-show=\"adornmentLabel(row, '{f}')\" @mousedown.prevent @click=\"onAdornment(row, '{f}')\" :title=\"adornmentLabel(row, '{f}')\" :aria-label=\"adornmentLabel(row, '{f}')\" x-text=\"adornmentLabel(row, '{f}')\"></button></div>");
         }
 
-        if (column.Kind is not (EditorKind.Computed or EditorKind.ReadOnly))
+        if (column.Kind is not (EditorKind.Computed or EditorKind.ReadOnly) && !column.ReadOnly)
         {
             sb.Append($"<div class=\"noe-error\" :id=\"{errorId}\" x-show=\"cellError(row, '{f}')\" x-text=\"cellError(row, '{f}')\"></div>");
         }

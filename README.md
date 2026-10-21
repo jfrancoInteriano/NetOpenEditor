@@ -112,12 +112,17 @@ El controller recibe `List<JournalLine> Lines` bindeada por índice, exactamente
 |---|---|
 | `.Column(l => l.Prop, c => ...)` | Tipo inferido: `string`→texto, `int`→entero, `decimal`→decimal, `DateOnly`→fecha, `bool`→toggle. `Guid`/enum exigen `.Select()` o `.Lookup()` |
 | `.Header(t)` `.Placeholder(t)` `.Width(css)` `.Align(CellAlign)` `.Required()` `.Total()` `.Decimals(n)` | Presentación y validación |
-| `.Text()` `.Integer()` `.Decimal(n)` `.Date()` `.Toggle()` `.ReadOnly()` `.Hidden()` `.Select(options)` | Editor explícito |
+| `.Text()` `.Integer()` `.Decimal(n)` `.Date()` `.Toggle()` `.Hidden()` `.Select(options)` | Editor explícito |
+| `.ReadOnly()` | Muestra sin dejar escribir; una columna numérica sigue siendo numérica |
+| `.AllowAdd(false)` `.AllowDelete(false)` | Quitan agregar y borrar filas (nivel editor) |
 | `.Lookup(url, lk => lk.ValueField().LabelField().Display().Label().Companion().MinLength().Debounce())` | Lookup remoto `GET url?term=` → JSON array |
 | `.Computed("Field", "Header", c => c.Decimal(2).Total())` | Columna calculada en cliente (hook `compute`), nunca se postea |
 | `.MinRows(n)` | Mínimo de filas al enviar |
 
 TagHelper: `editor-id`, `rows`, `name-prefix` (default `Lines`), `hide-columns="A,B"` (se postean como hidden).
+
+Una columna **calculada** nombrada en `hide-columns` se quita de la vista por completo: nunca se
+postea, así que no hay nada que conservar en un input oculto.
 
 ### Ocultar una columna mientras el formulario está abierto
 
@@ -162,11 +167,27 @@ se apaga.
 Cuando el editor se queda sin filas, el cuerpo muestra el texto `rows.empty` ("Sin líneas") en vez de
 quedar vacío.
 
-**Borrar no cambia:** se sigue controlando con el hook `canRemove`. Y `AllowAdd(false)` convive con
+**Borrar se declara aparte:** `AllowDelete(false)` quita el botón de borrar de todas las filas —lo
+habitual junto a `AllowAdd(false)` cuando las líneas vienen de un documento— y el hook `canRemove`
+sigue decidiendo fila por fila cuando borrar está permitido. Y `AllowAdd(false)` convive con
 `MinRows(n)`: el mínimo sigue siendo el suelo para borrar las líneas que llegaron del servidor. Si los
 datos llegan por debajo de ese mínimo, `validate()` lo reporta al guardar, como siempre.
 
 Ejemplo vivo: `/receipt/edit` en `samples/NetOpenEditor.Example`.
+
+## Sólo lectura: `ReadOnly()`
+
+Sólo lectura es un **estado de edición, no un cambio de tipo**. Una columna numérica declarada
+`ReadOnly()` sigue siendo numérica: conserva sus decimales, se puede sumar con `Total()` y acepta
+`Min`/`Max`.
+
+```csharp
+.Column(l => l.Ordered, c => c.Header("Pedido").Decimal(2).ReadOnly().Total())
+```
+
+La celda muestra el valor con su formato (`3.00`, no `3`) y lo postea en un input oculto, así que el
+formulario recibe el mismo campo que si fuera editable. Una columna no numérica con `ReadOnly()`
+—texto, fecha, selector— se dibuja como antes: el valor como texto más su input oculto.
 
 ## Columna calculada editable: `Computed(...).Editable()`
 
@@ -406,12 +427,57 @@ NetOpenEditor.configure(id, {
   onCellChange(row, field, editor), compute(row, editor), totals(rows, editor) => ({ Field: n }),
   canRemove(row, editor), isLocked(row, editor), onRowAdded(row, editor), onRowRemoved(row, editor),
   onLookupSelected(row, field, item, editor), lookupParams(row, field, editor),
+  lookupUrl(row, field, url, editor), onSuggestionSelected(row, field, item, editor),
   onComputedInput(row, field, value, editor), adornmentLabel(row, field, editor),
   onAdornment(row, field, editor), cellTitle(row, field, editor)
 });
-const ed = NetOpenEditor.get(id);   // rows(), addRow(values), removeRow(i), set(row, field, v), focusCell(i, field), validate(), recalc(), refresh(), totals, num(v), fmt(v, d)
+const ed = NetOpenEditor.get(id);   // rows() / realRows(), addRow(values), removeRow(i), set(row, field, v, opts), focusCell(i, field), validate(), recalc(), refresh(), totals, num(v), fmt(v, d)
 ```
 Eventos DOM (burbujean): `noe:ready`, `noe:change` con `detail = { id, editor, rows, totals }`.
+
+### Qué es `editor` dentro de un hook
+
+El `editor` que recibe un hook es el **componente**, no la fachada que devuelve `get(id)`. Comparten
+casi todo (`num`, `fmt`, `set`, `focusCell`, `validate`, `recalc`, `refresh`), pero la lista de filas
+se llama `realRows()` en el componente y `rows()` en la fachada. `realRows()` también existe en la
+fachada, así que llamando a ese nombre el mismo código sirve en los dos lados.
+
+### Un hook que falla lo dice
+
+Si un hook lanza, el editor **no se cae y no se calla**: escribe en consola el nombre del hook y la
+fila (`hook "compute" on row 3 threw: ...`) y sigue andando. Los errores repetidos se emiten una sola
+vez, porque un hook leído desde un binding se evalúa en cada repintado.
+
+### Escribir desde el host: `set`, `recalc`, `refresh`
+
+| Llamada | Qué hace |
+|---|---|
+| `set(row, field, value)` | Escribe la celda, corre `compute`, recalcula totales y emite `noe:change`. **No** llama a `onCellChange`: quien escribe ya sabe que escribió, y llamarlo re-entraría en un hook que suele llamar a `set`. |
+| `set(row, field, value, { notify: true })` | El mismo camino que una tecla, `onCellChange` incluido. |
+| `recalc()` | Sólo vuelve a sumar los totales. |
+| `refresh()` | Recálculo completo: corre `compute` en todas las filas, vuelve a pedir rótulos de adorno y títulos, y recalcula los totales. |
+
+### Mover el endpoint de un lookup sin rehacer el editor
+
+La URL declarada en `Lookup(...)` es el punto de partida; el hook `lookupUrl` la reemplaza en cada
+búsqueda, para cuando depende de algo que el usuario cambia en la página (otro proveedor, otra
+bodega):
+
+```js
+NetOpenEditor.configure('invoice-lines', {
+    lookupUrl: (row, field, url) => url.replace('/products/', `/suppliers/${supplierId()}/products/`)
+});
+```
+
+Para filtrar sin cambiar de endpoint alcanza con `Param(name, selector)` o el hook `lookupParams`,
+que se leen igual en cada búsqueda.
+
+### Tipos de las filas sembradas
+
+Los valores que siembra el servidor llegan con **el tipo declarado de la columna**: un decimal llega
+como número y un booleano como `true`/`false`, también en columnas `Hidden()` y `ReadOnly()`. `null`
+se respeta: significa "celda vacía", y convertirlo a 0 haría pasar por llena una celda requerida que
+el usuario borró.
 
 **Envío programático:** `form.submit()` no dispara `submit`, así que una vista con envío propio debe
 llamar `NetOpenEditor.get(id).validate()` antes.

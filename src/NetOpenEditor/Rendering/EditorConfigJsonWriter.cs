@@ -23,6 +23,7 @@ public static class EditorConfigJsonWriter
         writer.WriteString("prefix", context.NamePrefix);
         writer.WriteNumber("minRows", options.MinRows);
         writer.WriteBoolean("allowAdd", options.AllowAdd);
+        writer.WriteBoolean("allowDelete", options.AllowDelete);
 
         writer.WritePropertyName("locale");
         writer.WriteStartObject();
@@ -33,6 +34,7 @@ public static class EditorConfigJsonWriter
         writer.WriteStartArray();
         foreach (var column in options.Columns)
         {
+            if (IsDropped(column, context)) continue;
             var kind = EffectiveKind(column, context);
             writer.WriteStartObject();
             writer.WriteString("field", column.Field);
@@ -45,6 +47,7 @@ public static class EditorConfigJsonWriter
             writer.WriteBoolean("total", column.Total);
             if (column.Adornment) writer.WriteBoolean("adornment", true);
             if (column.Editable) writer.WriteBoolean("editable", true);
+            if (column.ReadOnly) writer.WriteBoolean("readOnly", true);
             writer.WriteString("align", column.Align switch { CellAlign.End => "end", CellAlign.Center => "center", _ => "start" });
             if (column.WidthCss is null) writer.WriteNull("width"); else writer.WriteString("width", column.WidthCss);
             if (column.Placeholder is null) writer.WriteNull("placeholder"); else writer.WriteString("placeholder", column.Placeholder);
@@ -121,6 +124,13 @@ public static class EditorConfigJsonWriter
     /// <summary>A column listed in <see cref="EditorRenderContext.HiddenColumns"/> renders as Hidden; computed columns cannot be hidden that way.</summary>
     public static EditorKind EffectiveKind<TLine>(EditorColumn<TLine> column, EditorRenderContext context) =>
         context.HiddenColumns.Contains(column.Field) && column.Kind != EditorKind.Computed ? EditorKind.Hidden : column.Kind;
+
+    /// <summary>
+    /// A computed column named in hide-columns leaves the view altogether. "Hidden" elsewhere means
+    /// "posted without a cell", and a computed column is never posted, so there is nothing to keep.
+    /// </summary>
+    public static bool IsDropped<TLine>(EditorColumn<TLine> column, EditorRenderContext context) =>
+        column.Kind == EditorKind.Computed && context.HiddenColumns.Contains(column.Field);
 
     public static string KindName(EditorKind kind) => kind switch
     {

@@ -29,10 +29,13 @@
 
   const NAV_KEYS = new Set(['Tab', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'Home', 'End']);
   const NON_EDITABLE = new Set(['computed', 'hidden', 'readonly']);
+  /** A cell the user cannot type into: by kind, or a numeric column declared ReadOnly(). */
+  const isReadOnlyColumn = (c) => !c || NON_EDITABLE.has(c.kind) || c.readOnly === true;
   const LOOKUP_PANEL_HEIGHT = 260;
   const MAX_PASTE_ROWS = 500;
   const MAX_PASTE_LOOKUPS = 100;   // distinct terms resolved per paste
   const LOOKUP_CONCURRENCY = 6;
+  const HOOK_ERRORS = new Set();   // one console line per distinct hook failure
 
   /** Splits clipboard text (Excel copies TSV) into a matrix. Pure: exported for tests and hosts. */
   const parseClipboard = (text) => {
@@ -57,14 +60,20 @@
     if (!inst) return null;
     return {
       rows: () => inst.realRows(),
+      /** Same list under the name the component uses, so a hook and the page can call the same thing. */
+      realRows: () => inst.realRows(),
       addRow: (values) => inst.addRow(values),
       removeRow: (i) => inst.removeRow(i),
-      set: (row, field, value) => inst.set(row, field, value),
+      set: (row, field, value, options) => inst.set(row, field, value, options),
       focusCell: (i, field) => inst.focusCell(i, field),
       validate: () => inst.validate(),
       recalc: () => inst.recalc(),
-      /** Re-reads anything the editor cannot observe: adornment labels that depend on the page. */
-      refresh: () => { inst.adornVersion++; inst.recalc(); },
+      /**
+       * Full recalculation: runs compute() on every row, re-reads what the editor cannot observe
+       * (adornment labels and titles that depend on the page) and recomputes the totals.
+       * recalc() alone only adds the totals up again.
+       */
+      refresh: () => { inst.adornVersion++; for (const r of inst.realRows()) inst.runCompute(r); inst.recalc(); },
       get totals() { return inst.totals; },
       num: (v) => inst.num(v),
       fmt: (v, d) => inst.fmt(v, d)
@@ -121,6 +130,8 @@
       formError: '',
       formErrorIsMinRows: false,   // the min-rows error clears itself once the line it asks for exists
       adornVersion: 0,   // bumped by refresh(): lets labels follow state outside the editor
+      computing: false,  // guards compute() against a hook that calls back into the editor
+      allowDelete: true,
       focusSnapshot: null,
       lookup: { open: false, rowKey: null, field: null, items: [], active: -1, loading: false, style: '', mode: 'lookup' },
 
@@ -133,6 +144,8 @@
         this.hooks = HOOKS[id] || {};
         // Missing in configs from older packages: adding stays on unless the editor opts out.
         this.allowAdd = this.config.allowAdd !== false;
+        // Same shape as allowAdd: missing in configs from older packages means "still allowed".
+        this.allowDelete = this.config.allowDelete !== false;
 
         const rows = readJson(this.$root, 'data-noe-rows') || [];
         const errors = readJson(this.$root, 'data-noe-errors') || {};
@@ -196,10 +209,32 @@
       fmt(v, d) { return fmt(v, d); },
       num(v) { return toNumber(v) ?? 0; },
       isEmptyValue(v) { return v === null || v === undefined || v === '' || v === false; },
-      locked(row) { return !!row && !row.__phantom && typeof this.hooks.isLocked === 'function' && !!this.hooks.isLocked(row, this); },
+      /**
+        * Runs a host hook. A hook that throws used to take its operation down with it and leave no
+        * trace — a calculation that simply stopped running — so the failure is named here, with the
+        * hook and the row, and the editor keeps going. Repeats of the same failure are swallowed:
+        * a hook read from a binding would otherwise flood the console.
+        */
+      hook(name, args, row) {
+        const fn = this.hooks[name];
+        if (typeof fn !== 'function') return undefined;
+        try {
+          return fn.apply(this.hooks, args);
+        } catch (err) {
+          const at = row ? ' on row ' + (this.rows.indexOf(row) + 1) : '';
+          const key = this.id + ':' + name + at + ':' + (err && err.message);
+          if (!HOOK_ERRORS.has(key)) {
+            HOOK_ERRORS.add(key);
+            console.error('[netopeneditor] hook "' + name + '"' + at + ' threw (repeats suppressed):', err);
+          }
+          return undefined;
+        }
+      },
+      locked(row) { return !!row && !row.__phantom && !!this.hook('isLocked', [row, this], row); },
       canRemove(row) {
-        if (!row || row.__phantom || this.locked(row)) return false;
-        return typeof this.hooks.canRemove === 'function' ? !!this.hooks.canRemove(row, this) : true;
+        if (!row || row.__phantom || !this.allowDelete || this.locked(row)) return false;
+        const answer = this.hook('canRemove', [row, this], row);
+        return answer === undefined ? true : !!answer;
       },
       hasErrors(row) { return !!row && Object.keys(row.__errors || {}).length > 0; },
       cellError(row, field) { const e = row && row.__errors ? row.__errors[field] : null; return e && e.length ? e.join(' ') : ''; },
@@ -218,7 +253,7 @@
           this.formError = '';
           this.formErrorIsMinRows = false;
         }
-        if (typeof this.hooks.onRowAdded === 'function') this.hooks.onRowAdded(row, this);
+        this.hook('onRowAdded', [row, this], row);
       },
       onFocus(e, i, field) {
         const row = this.rows[i];
@@ -274,23 +309,35 @@
       },
       afterChange(row, field) {
         if (row.__errors && row.__errors[field]) delete row.__errors[field];
-        if (typeof this.hooks.onCellChange === 'function') this.hooks.onCellChange(row, field, this);
+        this.hook('onCellChange', [row, field, this], row);
         this.runCompute(row);
         this.recalc();
         this.emit('noe:change', { field, row });
       },
-      runCompute(row) { if (typeof this.hooks.compute === 'function') this.hooks.compute(row, this); },
+      runCompute(row) {
+        // A compute() that calls back into the editor must not start a second pass over the row.
+        if (this.computing) return;
+        this.computing = true;
+        try { this.hook('compute', [row, this], row); } finally { this.computing = false; }
+      },
+      /** Totals only. compute() is not re-run here; refresh() is the full recalculation. */
       recalc() {
         const real = this.realRows();
         const totals = {};
         for (const c of this.columns) {
           if (c.total) totals[c.field] = real.reduce((sum, r) => sum + (toNumber(r[c.field]) ?? 0), 0);
         }
-        if (typeof this.hooks.totals === 'function') Object.assign(totals, this.hooks.totals(real, this) || {});
+        Object.assign(totals, this.hook('totals', [real, this]) || {});
         this.totals = totals;
       },
-      set(row, field, value) {
+      /**
+        * Writes a cell on behalf of the host. onCellChange is NOT called: the host already knows it
+        * wrote, and calling it would re-enter a hook that commonly calls set() itself. Pass
+        * { notify: true } to take the same path a keystroke takes, hook included.
+        */
+      set(row, field, value, options) {
         row[field] = value;
+        if (options && options.notify) { this.afterChange(row, field); return; }
         this.runCompute(row);
         this.recalc();
         this.emit('noe:change', { field, row });
@@ -310,7 +357,7 @@
         const row = this.rows[i];
         if (!this.canRemove(row)) return;
         this.rows.splice(i, 1);
-        if (typeof this.hooks.onRowRemoved === 'function') this.hooks.onRowRemoved(row, this);
+        this.hook('onRowRemoved', [row, this], row);
         this.recalc();
         this.emit('noe:change', { removed: row });
         this.$nextTick(() => this.focusCell(Math.min(i, this.rows.length - 1), this.firstEditableField()));
@@ -362,9 +409,7 @@
         const row = this.rows[i];
         if (!row || this.locked(row)) return;
         if (row.__phantom) this.promote(row);
-        if (typeof this.hooks.onComputedInput === 'function') {
-          this.hooks.onComputedInput(row, field, e.target.value, this);
-        }
+        this.hook('onComputedInput', [row, field, e.target.value, this], row);
         this.runCompute(row);
         this.recalc();
         this.emit('noe:change', { field, row });
@@ -382,8 +427,7 @@
        */
       cellTitle(row, field) {
         void this.adornVersion;
-        if (typeof this.hooks.cellTitle !== 'function') return null;
-        const title = this.hooks.cellTitle(row, field, this);
+        const title = this.hook('cellTitle', [row, field, this], row);
         return title === null || title === undefined ? null : String(title);
       },
 
@@ -392,15 +436,14 @@
       adornmentLabel(row, field) {
         // Reading it registers the dependency, so refresh() repaints labels that come from the page.
         void this.adornVersion;
-        if (typeof this.hooks.adornmentLabel !== 'function') return '';
-        const label = this.hooks.adornmentLabel(row, field, this);
+        const label = this.hook('adornmentLabel', [row, field, this], row);
         return label === null || label === undefined ? '' : String(label);
       },
 
       /** The host decides what the button does; the editor only re-renders afterwards. */
       onAdornment(row, field) {
         if (this.locked(row) || typeof this.hooks.onAdornment !== 'function') return;
-        this.hooks.onAdornment(row, field, this);
+        this.hook('onAdornment', [row, field, this], row);
         this.runCompute(row);
         this.recalc();
         this.emit('noe:change', { field, row });
@@ -477,7 +520,7 @@
         if (tr.inputEl) tr.inputEl.value = row[field];
         if (row.__phantom) this.promote(row);
         // Companion copies unconditionally; here the host writes, so it can keep what the user typed.
-        if (typeof this.hooks.onSuggestionSelected === 'function') this.hooks.onSuggestionSelected(row, field, item, this);
+        this.hook('onSuggestionSelected', [row, field, item, this], row);
         this.lookupClose();
         this.afterChange(row, field);
       },
@@ -504,9 +547,7 @@
           const el = document.querySelector(selector);
           extra[name] = el ? el.value : null;
         }
-        if (typeof this.hooks.lookupParams === 'function') {
-          Object.assign(extra, this.hooks.lookupParams(row, field, this) || {});
-        }
+        Object.assign(extra, this.hook('lookupParams', [row, field, this], row) || {});
 
         for (const [name, value] of Object.entries(extra)) {
           // An empty filter is "no filter": sending name= would narrow the search to nothing.
@@ -514,7 +555,10 @@
           parts.push(encodeURIComponent(name) + '=' + encodeURIComponent(value));
         }
 
-        return cfg.url + (cfg.url.includes('?') ? '&' : '?') + parts.join('&');
+        // The endpoint can move with the page (another supplier, another warehouse): the hook sees
+        // the declared URL and returns the one to use for this search.
+        const base = this.hook('lookupUrl', [row, field, cfg.url, this], row) || cfg.url;
+        return base + (base.includes('?') ? '&' : '?') + parts.join('&');
       },
 
       // ----- pasted lookups -------------------------------------------------------------------
@@ -552,7 +596,7 @@
           row[posted] = item[json] === undefined ? null : item[json];
         }
         if (row.__errors) delete row.__errors[field];
-        if (typeof this.hooks.onLookupSelected === 'function') this.hooks.onLookupSelected(row, field, item, this);
+        this.hook('onLookupSelected', [row, field, item, this], row);
       },
 
       /**
@@ -622,7 +666,7 @@
 
       /** Converts one pasted cell for its column. `undefined` means "discard": the column does not take pasted values. */
       coercePasted(c, raw) {
-        if (!c || NON_EDITABLE.has(c.kind)) return undefined;
+        if (isReadOnlyColumn(c)) return undefined;
         // A lookup cell cannot take a raw string: onPaste queues it and resolves it remotely.
         if (c.kind === 'lookup') return undefined;
         // A suggest column posts text, so a pasted value needs no remote resolution.
@@ -781,7 +825,7 @@
         if (el.tagName === 'INPUT' && el.type === 'text' && typeof el.select === 'function') el.select();
       },
       firstEditableField() {
-        const c = this.columns.find((col) => !NON_EDITABLE.has(col.kind));
+        const c = this.columns.find((col) => !isReadOnlyColumn(col));
         return c ? c.field : null;
       },
       revert(i, field, el) {
@@ -941,7 +985,7 @@
         const tr = transient(this.id);
         if (tr.inputEl) tr.inputEl.value = row.__labels[field];
         if (row.__phantom) this.promote(row);
-        if (typeof this.hooks.onLookupSelected === 'function') this.hooks.onLookupSelected(row, field, item, this);
+        this.hook('onLookupSelected', [row, field, item, this], row);
         this.lookupClose();
         this.afterChange(row, field);
       },

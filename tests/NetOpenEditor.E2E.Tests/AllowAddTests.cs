@@ -112,6 +112,24 @@ public sealed class AllowAddTests(SampleServerFixture server)
     }
 
     [Fact]
+    public async Task AllowDeleteFalse_TakesTheRemoveButtonOff_WhileTheDefaultKeepsIt()
+    {
+        var fixedRows = await OpenAsync();
+        Assert.Equal(0, await fixedRows.Locator(".noe-btn-remove:visible").CountAsync());
+
+        // Neither shortcut nor API gets around it.
+        await fixedRows.Locator(Cell(0, "Received")).ClickAsync();
+        await fixedRows.Keyboard.PressAsync("Control+Delete");
+        await fixedRows.EvaluateAsync("() => NetOpenEditor.get('receipt-lines').removeRow(0)");
+        await fixedRows.WaitForTimeoutAsync(300);
+        Assert.Equal(3, await fixedRows.Locator("[data-noe-row]").CountAsync());
+
+        // The default is unchanged: an ordinary editor still lets the user delete a row.
+        var journal = await server.NewPageAsync("/journal/edit");
+        Assert.Equal(2, await journal.Locator(".noe-btn-remove:visible").CountAsync());
+    }
+
+    [Fact]
     public async Task AnEditorWithoutAllowAdd_StillGrows()
     {
         // The default is unchanged: the journal editor keeps its phantom row.

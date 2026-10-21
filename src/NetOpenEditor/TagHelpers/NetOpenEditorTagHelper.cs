@@ -30,7 +30,11 @@ public sealed class NetOpenEditorTagHelper : TagHelper
     [HtmlAttributeName("key")]
     public string? Key { get; set; }
 
-    /// <summary>Comma-separated fields rendered as hidden inputs (still posted) in this view.</summary>
+    /// <summary>
+    /// Comma-separated fields rendered as hidden inputs (still posted) in this view. A computed
+    /// column named here is dropped from the view instead, since it is never posted. Resolved once
+    /// at render time: for a column the page hides and shows again, use CSS on data-noe-col.
+    /// </summary>
     [HtmlAttributeName("hide-columns")]
     public string? HideColumns { get; set; }
 

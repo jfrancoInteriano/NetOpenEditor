@@ -63,14 +63,16 @@ public static class SampleApp
             .AddEditor<ReceiptLine>("receipt-lines", e => e
                 .Column(l => l.ProductCode, c => c.Header("Código").ReadOnly().Width("8rem"))
                 .Column(l => l.ProductName, c => c.Header("Producto").ReadOnly())
-                .Column(l => l.Ordered, c => c.Header("Pedido").Decimal(2).ReadOnly().Width("8rem"))
+                .Column(l => l.Ordered, c => c.Header("Pedido").Decimal(2).ReadOnly().Total().Width("8rem"))
                 .Column(l => l.Received, c => c.Header("Recibido").Decimal(2).Min(0m).Max(10m).Total().Width("9rem"))
                 .Column(l => l.Batch, c => c.Header("Lote").Width("10rem"))
                 // Resolved on every render: the list depends on per-request data.
                 .Column(l => l.TaxCode, c => c.Header("Impuesto").Width("10rem")
                     .Select(sp => sp.GetRequiredService<TaxCatalog>().Current()))
                 .Column(l => l.PurchaseOrderDetailId, c => c.Hidden())
-                .AllowAdd(false))
+                // The lines come from the purchase order: neither added nor removed, only filled in.
+                .AllowAdd(false)
+                .AllowDelete(false))
             .AddEditor<RequestLine>("request-lines", e => e
                 .Column(l => l.Description, c => c.Header("Producto").Required().Width("24rem")
                     .Placeholder("Buscar producto o escribir libre...")

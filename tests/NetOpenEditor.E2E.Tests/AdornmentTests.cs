@@ -137,6 +137,26 @@ public sealed class AdornmentTests(SampleServerFixture server)
     }
 
     [Fact]
+    public async Task TheButtonSitsBesideTheInput_NotUnderIt()
+    {
+        var page = await OpenAsync();
+
+        var input = await page.Locator(Cell(0, "DiscountShown")).BoundingBoxAsync();
+        var button = await Button(page, 0).First.BoundingBoxAsync();
+        Assert.NotNull(input);
+        Assert.NotNull(button);
+
+        // Same line: the button starts after the input ends and their vertical centres match.
+        Assert.True(button!.X >= input!.X + input.Width - 1, $"button x {button.X} vs input right {input.X + input.Width}");
+        Assert.True(Math.Abs((button.Y + button.Height / 2) - (input.Y + input.Height / 2)) < 4,
+            $"button centre {button.Y + button.Height / 2} vs input centre {input.Y + input.Height / 2}");
+
+        // And the row is still one line tall: a wrapped button would add its own height to it.
+        var row = await page.Locator("[data-noe-row='0']").BoundingBoxAsync();
+        Assert.True(row!.Height <= input.Height + 14, $"row {row.Height} vs input {input.Height}");
+    }
+
+    [Fact]
     public async Task RefreshStillRepaintsTheLabel_OnAnEditableComputedCell()
     {
         var page = await OpenAsync();

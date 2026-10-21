@@ -10,6 +10,7 @@ public sealed partial class EditorOptionsBuilder<TLine>
     private readonly List<IEditorColumnBuilder<TLine>> _columns = [];
     private int _minRows;
     private bool _allowAdd = true;
+    private bool _allowDelete = true;
 
     public EditorOptionsBuilder(string id)
     {
@@ -67,6 +68,19 @@ public sealed partial class EditorOptionsBuilder<TLine>
         return this;
     }
 
+    /// <summary>
+    /// Whether the user can delete rows. Default <see langword="true"/>. With <see langword="false"/>
+    /// no row carries the delete button, which is what an editor with fixed rows usually wants
+    /// together with <see cref="AllowAdd"/>. The <c>canRemove</c> hook still decides row by row when
+    /// deleting is allowed.
+    /// </summary>
+    public EditorOptionsBuilder<TLine> AllowDelete(bool allowDelete = true)
+    {
+        _allowDelete = allowDelete;
+        return this;
+    }
+
+    /// <summary>Minimum number of rows the form accepts; below it, saving reports <c>minRows</c>.</summary>
     public EditorOptionsBuilder<TLine> MinRows(int minRows)
     {
         if (minRows < 0) throw new EditorConfigurationException($"Editor '{_id}': MinRows cannot be negative.");
@@ -103,7 +117,7 @@ public sealed partial class EditorOptionsBuilder<TLine>
             throw new EditorConfigurationException($"Editor '{_id}' needs at least one column.");
         }
 
-        return new EditorOptions<TLine> { Id = _id, Columns = built, MinRows = _minRows, AllowAdd = _allowAdd };
+        return new EditorOptions<TLine> { Id = _id, Columns = built, MinRows = _minRows, AllowAdd = _allowAdd, AllowDelete = _allowDelete };
     }
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9_-]{0,63}$")]
