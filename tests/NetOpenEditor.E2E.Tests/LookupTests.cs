@@ -31,7 +31,7 @@ public sealed class LookupTests(SampleServerFixture server)
         Assert.Equal("3101", await Hidden(page, 2, "AccountCode").InputValueAsync());
         Assert.Equal("Capital", await Hidden(page, 2, "AccountName").InputValueAsync());
         Assert.Equal(4, await page.Locator("[data-noe-row]").CountAsync());
-        Assert.False(await page.Locator(".noe-lookup-panel").IsVisibleAsync());
+        await Assertions.Expect(page.Locator(".noe-lookup-panel")).ToBeHiddenAsync();
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class LookupTests(SampleServerFixture server)
         await page.Keyboard.TypeAsync("x");
         await page.WaitForSelectorAsync(".noe-lookup-panel:visible");
         await page.Keyboard.PressAsync("Escape");
-        Assert.False(await page.Locator(".noe-lookup-panel").IsVisibleAsync());
+        await Assertions.Expect(page.Locator(".noe-lookup-panel")).ToBeHiddenAsync();
 
         await page.Keyboard.PressAsync("Escape");
         Assert.Equal("1101 - Caja", await input.InputValueAsync());

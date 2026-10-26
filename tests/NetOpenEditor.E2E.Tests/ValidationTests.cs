@@ -93,7 +93,7 @@ public sealed class ValidationTests(SampleServerFixture server)
 
         await page.Locator(Cell(0, "Description")).FillAsync("Nueva linea");
 
-        Assert.True(await page.Locator(".noe-form-error").IsHiddenAsync());
+        await Assertions.Expect(page.Locator(".noe-form-error")).ToBeHiddenAsync();
     }
 
     [Fact]
