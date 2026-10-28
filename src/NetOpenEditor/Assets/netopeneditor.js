@@ -76,7 +76,8 @@
       refresh: () => { inst.adornVersion++; for (const r of inst.realRows()) inst.runCompute(r); inst.recalc(); },
       get totals() { return inst.totals; },
       num: (v) => inst.num(v),
-      fmt: (v, d) => inst.fmt(v, d)
+      fmt: (v, d) => inst.fmt(v, d),
+      fmtGrouped: (v, d) => inst.fmtGrouped(v, d)
     };
   };
   api.parseClipboard = parseClipboard;
@@ -102,6 +103,16 @@
   const fmt = (v, d) => {
     const n = toNumber(v);
     return n === null ? '' : n.toFixed(d);
+  };
+
+  // fmt() plus a ',' every three digits of the integer part. Only for text that is displayed: an
+  // input keeps fmt(), since sanitizeNumber would strip the commas as the user types.
+  const fmtGrouped = (v, d) => {
+    const s = fmt(v, d);
+    if (s === '') return s;
+    const [int, frac] = s.split('.');
+    const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return frac === undefined ? grouped : grouped + '.' + frac;
   };
 
   // Keeps digits, one leading '-', and (when decimals > 0) one '.' with at most `decimals` digits after it. ',' counts as '.'.
@@ -207,6 +218,7 @@
         return out;
       },
       fmt(v, d) { return fmt(v, d); },
+      fmtGrouped(v, d) { return fmtGrouped(v, d); },
       num(v) { return toNumber(v) ?? 0; },
       isEmptyValue(v) { return v === null || v === undefined || v === '' || v === false; },
       /**

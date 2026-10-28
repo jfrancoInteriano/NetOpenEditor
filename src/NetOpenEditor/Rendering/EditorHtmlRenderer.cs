@@ -150,7 +150,7 @@ public sealed class EditorHtmlRenderer<TLine>
             case EditorKind.Integer when column.ReadOnly:
             case EditorKind.Decimal when column.ReadOnly:
                 // Numeric and read-only: the formatted value, and the hidden input that posts it.
-                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmt(row['{f}'], {d})\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
+                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmtGrouped(row['{f}'], {d})\"></span><input type=\"hidden\" {name} :value=\"row['{f}'] ?? ''\">");
                 break;
 
             case EditorKind.Integer:
@@ -201,7 +201,7 @@ public sealed class EditorHtmlRenderer<TLine>
                 break;
 
             case EditorKind.Computed:
-                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmt(row['{f}'], {d})\"></span>");
+                sb.Append($"<span class=\"noe-text noe-num-text\" {title} x-text=\"fmtGrouped(row['{f}'], {d})\"></span>");
                 break;
 
             default:
@@ -236,7 +236,7 @@ public sealed class EditorHtmlRenderer<TLine>
               .Append("\" data-noe-col=\"").Append(Html.Encode(column.Field)).Append("\">");
             if (column.Total)
             {
-                sb.Append($"<span class=\"noe-total\" data-noe-total=\"{column.Field}\" x-text=\"fmt(totals['{column.Field}'], {column.Decimals})\"></span>");
+                sb.Append($"<span class=\"noe-total\" data-noe-total=\"{column.Field}\" x-text=\"fmtGrouped(totals['{column.Field}'], {column.Decimals})\"></span>");
             }
 
             sb.Append("</td>");

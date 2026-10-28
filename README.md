@@ -431,14 +431,14 @@ NetOpenEditor.configure(id, {
   onComputedInput(row, field, value, editor), adornmentLabel(row, field, editor),
   onAdornment(row, field, editor), cellTitle(row, field, editor)
 });
-const ed = NetOpenEditor.get(id);   // rows() / realRows(), addRow(values), removeRow(i), set(row, field, v, opts), focusCell(i, field), validate(), recalc(), refresh(), totals, num(v), fmt(v, d)
+const ed = NetOpenEditor.get(id);   // rows() / realRows(), addRow(values), removeRow(i), set(row, field, v, opts), focusCell(i, field), validate(), recalc(), refresh(), totals, num(v), fmt(v, d), fmtGrouped(v, d)
 ```
 Eventos DOM (burbujean): `noe:ready`, `noe:change` con `detail = { id, editor, rows, totals }`.
 
 ### Qué es `editor` dentro de un hook
 
 El `editor` que recibe un hook es el **componente**, no la fachada que devuelve `get(id)`. Comparten
-casi todo (`num`, `fmt`, `set`, `focusCell`, `validate`, `recalc`, `refresh`), pero la lista de filas
+casi todo (`num`, `fmt`, `fmtGrouped`, `set`, `focusCell`, `validate`, `recalc`, `refresh`), pero la lista de filas
 se llama `realRows()` en el componente y `rows()` en la fachada. `realRows()` también existe en la
 fachada, así que llamando a ese nombre el mismo código sirve en los dos lados.
 
@@ -615,6 +615,10 @@ document.addEventListener('noe:change', paint);
 
 - Cada fila real `i` postea `Lines[i].Campo` (índices contiguos; la fila fantasma no lleva `name`).
 - Decimales: texto normalizado a `toFixed(n)` con punto al perder el foco y antes del submit.
+- Formato en pantalla: las celdas numéricas de solo lectura, las calculadas no editables y los
+  totales del pie se muestran con separador de miles (`fmtGrouped`: `298850.44` → `298,850.44`).
+  Los inputs editables siguen sin separador (`fmt`) para poder teclear, y lo posteado es siempre el
+  número crudo, sin comas.
 - Toggle: checkbox `value="true"` + hidden `false`. Lookup: hidden con el valor. Calculada: nada.
 - Errores: claves `Lines[i].Campo` → celda; `Lines[i]` → fila.
 

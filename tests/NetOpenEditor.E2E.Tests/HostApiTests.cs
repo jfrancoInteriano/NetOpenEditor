@@ -91,4 +91,55 @@ public sealed class HostApiTests(SampleServerFixture server)
         using var json = await BoundJsonAsync(page);
         Assert.Equal(3, json.RootElement.GetProperty("Lines")[0].GetProperty("Ordered").GetDecimal());
     }
+
+    [Fact]
+    public async Task DisplayedAmounts_ShowThousandsSeparators_ButPostTheRawNumber()
+    {
+        var page = await server.NewPageAsync("/receipt/edit");
+
+        await page.EvaluateAsync("""
+            () => {
+                const ed = NetOpenEditor.get('receipt-lines');
+                const rows = ed.rows();
+                ed.set(rows[0], 'Ordered', 298850.44);
+                for (const r of rows.slice(1)) ed.set(r, 'Ordered', 0);
+                ed.recalc();
+            }
+            """);
+
+        var shown = page.Locator("[data-noe-row='0'] td[data-noe-col='Ordered'] .noe-num-text");
+        await Assertions.Expect(shown).ToHaveTextAsync("298,850.44");
+        await Assertions.Expect(page.Locator("[data-noe-total='Ordered']")).ToHaveTextAsync("298,850.44");
+        await Assertions.Expect(page.Locator("[data-noe-row='0'] td[data-noe-col='Ordered'] input[type='hidden']")).ToHaveValueAsync("298850.44");
+
+        Assert.Equal(
+            ["298,850.44", "-1,234.50", "999", "", "1,234.50"],
+            await page.EvaluateAsync<string[]>("""
+                () => {
+                    const ed = NetOpenEditor.get('receipt-lines');
+                    return [ed.fmtGrouped(298850.44, 2), ed.fmtGrouped(-1234.5, 2), ed.fmtGrouped(999, 0), ed.fmtGrouped(null, 2), ed.fmtGrouped('1234.5', 2)];
+                }
+                """));
+
+        await page.Locator(Cell(0, "Received")).FillAsync("2");
+        await page.Keyboard.PressAsync("Tab");
+        await page.Locator("#save").ClickAsync();
+
+        using var json = await BoundJsonAsync(page);
+        Assert.Equal(298850.44m, json.RootElement.GetProperty("Lines")[0].GetProperty("Ordered").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AnEditableDecimal_KeepsThePlainFormat_WhileTyping()
+    {
+        var page = await server.NewPageAsync("/quote/edit?id=NUEVA");
+
+        var price = page.Locator(Cell(0, "UnitPrice"));
+        await price.ClickAsync();
+        await price.PressSequentiallyAsync("298850.44");
+        await Assertions.Expect(price).ToHaveValueAsync("298850.44");
+
+        await page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(price).ToHaveValueAsync("298850.44");
+    }
 }

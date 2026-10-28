@@ -24,13 +24,13 @@ public sealed class QuoteEditorTests(SampleServerFixture server)
         Assert.Equal("1200.00", await page.Locator(Cell(0, "UnitPrice")).InputValueAsync());
         Assert.Equal("15.00", await page.Locator(Cell(0, "TaxRate")).InputValueAsync());
         Assert.Equal("1380.00", await page.Locator(Cell(0, "LineTotal")).InputValueAsync());
-        Assert.Equal("1380.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
+        Assert.Equal("1,380.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
 
         await page.Locator(Cell(0, "Quantity")).FillAsync("3");
         await page.Keyboard.PressAsync("Tab");
 
         Assert.Equal("4140.00", await page.Locator(Cell(0, "LineTotal")).InputValueAsync());
-        Assert.Equal("4140.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
+        Assert.Equal("4,140.00", await page.Locator("[data-noe-total='LineTotal']").InnerTextAsync());
         Assert.Equal("4140.00", await page.Locator("#grand-total").InnerTextAsync());
     }
 

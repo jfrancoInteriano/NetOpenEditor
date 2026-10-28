@@ -104,7 +104,7 @@ public sealed class EditorHtmlRendererTests
         Assert.Contains("""<input type="checkbox" class="noe-check" value="true" data-noe-field="Active" :name="nameFor(i, 'Active')" x-model="row['Active']" """.TrimEnd(), html);
         Assert.Contains("""<input type="hidden" :name="nameFor(i, 'Active')" value="false">""", html);
         // computed
-        Assert.Contains("""<span class="noe-text noe-num-text" :title="cellTitle(row, 'LineTotal')" x-text="fmt(row['LineTotal'], 2)"></span>""", html);
+        Assert.Contains("""<span class="noe-text noe-num-text" :title="cellTitle(row, 'LineTotal')" x-text="fmtGrouped(row['LineTotal'], 2)"></span>""", html);
         Assert.DoesNotContain("nameFor(i, 'LineTotal')", html);
         // per-cell error
         Assert.Contains("""<div class="noe-error" :id="'journal-r' + i + '-Description-err'" x-show="cellError(row, 'Description')" x-text="cellError(row, 'Description')"></div>""", html);
@@ -136,11 +136,37 @@ public sealed class EditorHtmlRendererTests
         var html = Render(JournalOptions());
 
         Assert.Contains("""<tfoot class="noe-tfoot"><tr role="row" aria-live="polite"><td class="noe-td noe-tfoot-label"><span class="noe-tfoot-text"><span x-text="t('totals')"></span> <span class="noe-muted" x-text="countLabel()"></span></span></td>""", html);
-        Assert.Contains("""<span class="noe-total" data-noe-total="DebitAmount" x-text="fmt(totals['DebitAmount'], 2)"></span>""", html);
-        Assert.Contains("""<span class="noe-total" data-noe-total="CreditAmount" x-text="fmt(totals['CreditAmount'], 2)"></span>""", html);
+        Assert.Contains("""<span class="noe-total" data-noe-total="DebitAmount" x-text="fmtGrouped(totals['DebitAmount'], 2)"></span>""", html);
+        Assert.Contains("""<span class="noe-total" data-noe-total="CreditAmount" x-text="fmtGrouped(totals['CreditAmount'], 2)"></span>""", html);
 
         var noTotals = Render(new EditorOptionsBuilder<TestLine>("x").Column(l => l.Description).Build());
         Assert.DoesNotContain("<tfoot", noTotals);
+    }
+
+    [Fact]
+    public void DisplayedNumbers_AreGrouped_ButEditableOnesAreNot()
+    {
+        var options = new EditorOptionsBuilder<TestLine>("grp")
+            .Column(l => l.DebitAmount, c => c.Decimal(2).ReadOnly().Total())
+            .Column(l => l.CreditAmount, c => c.Decimal(2))
+            .Computed("LineTotal", "Total", c => c.Decimal(2))
+            .Computed("Shown", "Shown", c => c.Decimal(2).Editable())
+            .Build();
+
+        var html = Render(options);
+
+        // Read-only, computed and total cells only display: they get the thousands separator.
+        Assert.Contains("x-text=\"fmtGrouped(row['DebitAmount'], 2)\"", html);
+        Assert.Contains("x-text=\"fmtGrouped(row['LineTotal'], 2)\"", html);
+        Assert.Contains("x-text=\"fmtGrouped(totals['DebitAmount'], 2)\"", html);
+        // The hidden input still posts the raw value.
+        Assert.Contains("<input type=\"hidden\" :name=\"nameFor(i, 'DebitAmount')\" :value=\"row['DebitAmount'] ?? ''\">", html);
+        // Inputs keep the plain format: a comma would be stripped while typing.
+        Assert.Contains("x-effect=\"syncNumber($el, row, 'CreditAmount', 2)\"", html);
+        Assert.Contains("x-effect=\"syncNumber($el, row, 'Shown', 2)\"", html);
+        Assert.DoesNotContain("fmtGrouped(row['CreditAmount']", html);
+        Assert.DoesNotContain("fmtGrouped(row['Shown']", html);
+        Assert.DoesNotContain("x-text=\"fmt(", html);
     }
 
     [Fact]

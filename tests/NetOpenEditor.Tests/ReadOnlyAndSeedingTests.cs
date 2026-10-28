@@ -59,7 +59,7 @@ public sealed class ReadOnlyAndSeedingTests
 
         var html = Render(options);
 
-        Assert.Contains("""<span class="noe-text noe-num-text" :title="cellTitle(row, 'DebitAmount')" x-text="fmt(row['DebitAmount'], 2)"></span>""", html);
+        Assert.Contains("""<span class="noe-text noe-num-text" :title="cellTitle(row, 'DebitAmount')" x-text="fmtGrouped(row['DebitAmount'], 2)"></span>""", html);
         Assert.Contains("""<input type="hidden" :name="nameFor(i, 'DebitAmount')" :value="row['DebitAmount'] ?? ''">""", html);
         // It is numeric, so the footer carries its total.
         Assert.Contains("""data-noe-total="DebitAmount" """.TrimEnd(), html);
@@ -97,7 +97,7 @@ public sealed class ReadOnlyAndSeedingTests
 
         // A computed column is never posted, so hiding it means not drawing it at all.
         Assert.DoesNotContain("data-noe-col=\"LineTotal\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("fmt(row['LineTotal']", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("fmtGrouped(row['LineTotal']", html, StringComparison.Ordinal);
         Assert.DoesNotContain("nameFor(i, 'LineTotal')", html, StringComparison.Ordinal);
     }
 
